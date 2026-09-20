@@ -76,7 +76,7 @@ function buildHub(mk, world) {
 
   // transitions (physical world is fully connected; elevator to cistern only)
   world.transitions.push({
-    room: 'drain', toRoom: 'cistern', toX: 138, toZ: 10, toY: -41.5,
+    room: 'drain', toRoom: 'cistern', toX: 138, toZ: 32, toY: -41.5,
     minX: 133.5, maxX: 142.5, minZ: 6.5, maxZ: 13.5, minY: -1, maxY: 3, take: 'down',
   });
 

@@ -687,11 +687,18 @@ export class Game {
   // ---------- per-frame update ----------
   loop() {
     requestAnimationFrame(this.loop);
-    const dt = Math.min(this.clock.getDelta(), 0.05);
-    const t = this.clock.elapsedTime || (this.clock.elapsedTime = 0);
-    this.clock.elapsedTime += dt;
-
-    this.update(dt);
+    const now = performance.now();
+    const raw = this.lastFrameTime ? (now - this.lastFrameTime) / 1000 : 0.05;
+    this.lastFrameTime = now;
+    // fixed-step accumulator: world runs at real speed even at low fps
+    this.stepAcc = (this.stepAcc || 0) + Math.min(raw, 0.25);
+    let steps = 0;
+    while (this.stepAcc >= 0.05 && steps < 8) {
+      this.stepAcc -= 0.05;
+      this.clock.elapsedTime += 0.05;
+      this.update(0.05);
+      steps++;
+    }
     this.renderer.render(this.scene, this.camera);
   }
 
@@ -737,7 +744,8 @@ export class Game {
     } else if (this.mode === 'map') {
       if (input.map || input.pause) this.toggleMap();
     } else if (this.mode === 'pause') {
-      // buttons drive resume/title; presses are consumed here
+      if (input.pause) { this.resumeFromPause(); }
+      this.input.consume();
     } else if (this.mode === 'combat') {
       this.driftCamera(dt);
     }

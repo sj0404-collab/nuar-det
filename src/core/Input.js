@@ -102,8 +102,6 @@ export class Input {
     this.lensPressed = false;
     this.mapPressed = false;
     this.pausePressed = false;
-    this._jump = false;
-    this._dash = false;
     this.deckPressed = false;
     this.pressed.clear();
     return out;
