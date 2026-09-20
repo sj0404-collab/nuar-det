@@ -158,6 +158,7 @@ export class Player {
     for (const m of [legLM, legRM]) addInkOutline(m, { thickness: 0.012, opacity: 0.8 });
 
     g.position.copy(this.pos);
+    g.rotation.y = Math.PI;
     scene.add(g);
     this.mesh = g;
     this.head = head;
@@ -188,7 +189,7 @@ export class Player {
     const sin = Math.sin(cameraYaw);
     const cos = Math.cos(cameraYaw);
     let mx = axis.x * cos - axis.z * sin;
-    let mz = axis.x * sin + axis.z * cos;
+    let mz = -(axis.x * sin + axis.z * cos);
     const len = Math.hypot(mx, mz);
     if (len > 1) { mx /= len; mz /= len; }
 
