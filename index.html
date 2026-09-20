@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>Нуар-Дет — карточный детектив</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='13' font-size='13'>🕵️</text></svg>" />
+  <link rel="stylesheet" href="/src/ui/style.css" />
+</head>
+<body>
+  <div id="app">
+    <canvas id="game-canvas"></canvas>
+
+    <!-- HUD -->
+    <div id="hud" class="hidden">
+      <div id="vignette"></div>
+
+      <div id="safe-zone">
+        <div id="top-bar">
+          <div id="left-panel">
+            <div id="case-label">Дело №0</div>
+          </div>
+          <div id="logs"></div>
+          <div id="abilities"></div>
+          <div id="right-panel">
+            <button id="btn-map" class="icon-btn" aria-label="Карта">🗺</button>
+            <button id="btn-menu" class="icon-btn" aria-label="Меню">≡</button>
+          </div>
+        </div>
+
+        <div id="bottom-bar">
+          <div id="touch-controls" class="hidden">
+            <div id="joy-zone"><div id="joy-base"><div id="joy-thumb"></div></div></div>
+            <div id="act-buttons">
+              <button id="btn-jump" class="act-btn" aria-label="Прыжок">✦</button>
+              <button id="btn-dash" class="act-btn" aria-label="Рывок">➤</button>
+              <button id="btn-interact" class="act-btn hidden" aria-label="Взаимодействие">!</button>
+            </div>
+          </div>
+          <div id="hint" class="hidden"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- UI Screens -->
+    <div id="screen-title" class="screen">
+      <div class="title-bg"></div>
+      <div class="title-content">
+        <h1 class="glitch" data-text="НУАР-ДЕТ">НУАР-ДЕТ</h1>
+        <p class="subtitle">Карточный детектив в тёмном городе Ноктис</p>
+        <p class="story-tease">
+          Лондон никогда не был светлым. Но сейчас он пропитан насквозь магией,
+          и городской туман завязан в узлы из снов, улик и чужих смертей.
+          Вы — Морвен Стоун, детектив с тенью вместо доверия.
+          Шерлок Холмс знал логику. Вы знаете кое-что пострашнее — метафорику вещей.
+        </p>
+        <div class="menu-buttons">
+          <button id="btn-start" class="menu-btn primary">Начать расследование</button>
+          <button id="btn-credits" class="menu-btn">Как играть</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="screen-credits" class="screen hidden">
+      <div class="title-content">
+        <h2>Как играть</h2>
+        <ul class="help-list">
+          <li><b>ПК:</b> WASD/стрелки — движение, Пробел — прыжок (двойной — двойной прыжок), Shift/LKM — рывок, E — взаимодействие, Q — лупа (осмотр), Tab/M — карта, C — колода.</li>
+          <li><b>Сенсор:</b> левая половина экрана — виртуальный джойстик, правая — прыжок ✦ и рывок ➤.</li>
+          <li>Собирайте <b>ключи-улики</b>, открывайте проходы, находите <b>арканы</b> — новые способности в духе метроидвании.</li>
+          <li>В бою разыгрывайте <b>карты-дедукции</b> против порождений тумана.</li>
+          <li>Развилки в диалогах меняют <b>ветки сюжета</b> и концовку.</li>
+        </ul>
+        <button id="btn-back-title" class="menu-btn">Назад</button>
+      </div>
+    </div>
+
+    <div id="screen-pause" class="screen hidden">
+      <div class="title-content">
+        <h2>Пауза</h2>
+        <div class="menu-buttons">
+          <button id="btn-resume" class="menu-btn primary">Продолжить</button>
+          <button id="btn-map-full" class="menu-btn">Карта города</button>
+          <button id="btn-to-title" class="menu-btn">В титул</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="screen-map" class="screen hidden">
+      <div class="map-wrap">
+        <h2>Карта Ноктиса</h2>
+        <canvas id="map-canvas" width="560" height="420"></canvas>
+        <div id="map-legend"></div>
+        <button id="btn-map-close" class="menu-btn">Закрыть</button>
+      </div>
+    </div>
+
+    <div id="screen-ending" class="screen hidden">
+      <div class="title-content">
+        <h2 id="ending-title"></h2>
+        <p id="ending-text" class="story-tease"></p>
+        <div class="menu-buttons">
+          <button id="btn-ending-title" class="menu-btn">К титулу</button>
+          <button id="btn-ending-play" class="menu-btn primary">Сыграть заново</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Dialogue -->
+    <div id="dialogue-box" class="hidden">
+      <div id="dialogue-speaker"></div>
+      <div id="dialogue-text"></div>
+      <div id="dialogue-choices"></div>
+      <div id="dialogue-next">▼ нажмите, чтобы продолжить</div>
+    </div>
+
+    <!-- Interaction prompt handled by HUD hint -->
+
+    <!-- Card combat -->
+    <div id="combat-screen" class="hidden">
+      <div id="combat-stage">
+        <div id="enemy-zone">
+          <div id="enemy-card"></div>
+          <div id="enemy-name"></div>
+        </div>
+        <div id="battle-log"></div>
+        <div id="player-zone">
+          <div id="player-stats"></div>
+          <div id="hand"></div>
+        </div>
+        <div id="combat-top">
+          <div id="turn-indicator"></div>
+          <button id="btn-end-turn" class="menu-btn small">Завершить ход»</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="toast"></div>
+    <div id="load-screen">Загрузка мира...</div>
+  </div>
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
