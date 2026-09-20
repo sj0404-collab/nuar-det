@@ -750,14 +750,8 @@ export class Game {
 
   updateCamera(dt) {
     const p = this.player;
-    const moving = Math.abs(p.vel.x) > 0.4 || Math.abs(p.vel.z) > 0.4;
-    if (moving) {
-      const target = Math.atan2(-p.vel.x, -p.vel.z);
-      let d = target - this.cameraYaw;
-      while (d > Math.PI) d -= Math.PI * 2;
-      while (d < -Math.PI) d += Math.PI * 2;
-      this.cameraYaw += d * Math.min(1, dt * 5);
-    }
+    const cam = this.input.camHeld;
+    if (cam !== 0) this.cameraYaw += cam * 2.7 * dt;
     const dist = 9;
     const hy = 3.1;
     const ax = Math.sin(this.cameraYaw) * dist;

@@ -12,6 +12,7 @@ export class Input {
     this.lensPressed = false;
     this.mapPressed = false;
     this.pausePressed = false;
+    this.camHeld = 0;
 
     this.bind();
     if (this.touch) {
@@ -44,9 +45,11 @@ export class Input {
       this.keys.add(k);
       this.pressed.add(k);
       if (k === ' ' || k === 'arrowup' || k === 'w') { this.jumpHeld = true; this.jumpPressed = true; e.preventDefault(); }
-      if (k === 'shift' || k === 'e' || k === 'л') { this.dashPressed = true; }
+      if (k === 'shift') { this.dashPressed = true; }
       if (k === 'f' || k === 'а') { this.interactPressed = true; }
-      if (k === 'q' || k === 'й') { this.lensPressed = true; }
+      if (k === 'q' || k === 'й') { this.camHeld = -1; }
+      if (k === 'e' || k === 'л') { this.camHeld = 1; }
+      if (k === 'l' || k === 'д') { this.lensPressed = true; }
       if (k === 'tab' || k === 'm' || k === 'ь') { this.mapPressed = true; e.preventDefault(); }
       if (k === 'escape' || k === 'p' || k === 'з') { this.pausePressed = true; }
       if (k === 'c') { this.deckPressed = true; }
@@ -55,9 +58,10 @@ export class Input {
       const k = e.key.toLowerCase();
       this.keys.delete(k);
       if (k === ' ' || k === 'arrowup' || k === 'w') this.jumpHeld = false;
-      if (k === 'shift' || k === 'e' || k === 'л') {}
+      if (k === 'q' || k === 'й') { if (this.camHeld === -1) this.camHeld = 0; }
+      if (k === 'e' || k === 'л') { if (this.camHeld === 1) this.camHeld = 0; }
     });
-    window.addEventListener('blur', () => { this.keys.clear(); this.jumpHeld = false; });
+    window.addEventListener('blur', () => { this.keys.clear(); this.jumpHeld = false; this.camHeld = 0; });
   }
 
   axis2D() {

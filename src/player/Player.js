@@ -55,7 +55,6 @@ export class Player {
     const darkMat = makePainterlyMaterial(0x1c2129, { rimStrength: 0.4 });
     const skinMat = makePainterlyMaterial(0xd8c9ae, { rimStrength: 0.3 });
     const hatMat = makePainterlyMaterial(0x232931, { rimStrength: 0.5 });
-    const goldMat = makePainterlyMaterial(0xd4a559, { emission: 0xd4a559, emissionBias: 0.35, rimStrength: 0.3 });
 
     // --- legs ---
     this.legL = new THREE.Group();
@@ -140,15 +139,20 @@ export class Player {
     this.hat.position.y = 0.02;
     g.add(this.hat);
 
-    // --- scarf ---
+    // --- scarf (trailing ribbon, lags the turn) ---
+    const scarfMat = makePainterlyMaterial(0xc98f3f, { rimStrength: 0.3 });
     this.scarf = new THREE.Group();
-    const scarfBack = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.06, 0.1), goldMat);
-    scarfBack.position.set(0, 0.2, -0.08);
-    const scarfTail = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.05, 0.9), goldMat);
-    scarfTail.position.set(0, 0.12, -0.5);
-    this.scarf.add(scarfBack, scarfTail);
-    this.scarf.position.y = 1.06;
+    const knot = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.07, 0.14), scarfMat);
+    knot.position.set(0, 0.14, -0.05);
+    const tailMat = makePainterlyMaterial(0xc98f3f, { emission: 0x8a5f2e, emissionBias: 0.12, rimStrength: 0.3 });
+    const tailGeo = new THREE.CylinderGeometry(0.018, 0.07, 0.5, 8);
+    tailGeo.rotateX(Math.PI / 2);
+    this.scarfTail = new THREE.Mesh(tailGeo, tailMat);
+    this.scarfTail.position.set(0, 0.06, -0.36);
+    this.scarf.add(knot, this.scarfTail);
+    this.scarf.position.y = 1.0;
     g.add(this.scarf);
+    this.scarfYaw = Math.PI;
 
     // ink outlines on key pieces
     addInkOutline(this.coat, { thickness: 0.014 });
@@ -337,9 +341,16 @@ export class Player {
     this.hat.rotation.x = lean - Math.cos(this.walkT * 0.5) * 0.04;
     this.hat.position.y = 0.02 - bob;
 
-    // scarf flutter
-    this.scarf.rotation.x = Math.sin(t * 7) * 0.12 + lean * 0.4;
-    this.scarf.position.y = 1.06 + Math.sin(t * 5) * 0.015;
+    // scarf trailing lag — the tail sweeps behind turns
+    const targetYaw = this.mesh.rotation.y + Math.PI;
+    let yawD = targetYaw - this.scarfYaw;
+    while (yawD > Math.PI) yawD -= Math.PI * 2;
+    while (yawD < -Math.PI) yawD += Math.PI * 2;
+    this.scarfYaw += yawD * Math.min(1, dt * 4.5);
+    this.scarf.rotation.y = this.scarfYaw - this.mesh.rotation.y;
+    const flutter = Math.sin(t * 7) * 0.14 + lean * 0.5;
+    this.scarf.rotation.x = flutter * Math.sign(this.scarf.rotation.y > 0.05 ? -1 : 1) * Math.min(1, Math.abs(this.scarf.rotation.y) * 2 + 0.4);
+    this.scarf.position.y = 1.0 + Math.sin(t * 5) * 0.015;
 
     // squash on landing
     if (this.landT > 0) {
