@@ -72,6 +72,7 @@ export class Game {
       onPause: () => this.togglePause(),
       onMap: () => this.toggleMap(),
       onToTitle: () => this.toTitle(),
+      onCamSens: (val) => this.touch.setCamSensitivity(val),
     });
     this.screens.showTitle();
 

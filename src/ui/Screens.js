@@ -20,6 +20,18 @@ export class Screens {
     document.getElementById('btn-to-title').addEventListener('click', () => this.hooks.onToTitle && this.hooks.onToTitle());
     document.getElementById('btn-map').addEventListener('click', () => this.hooks.onMap && this.hooks.onMap());
     document.getElementById('btn-menu').addEventListener('click', () => this.hooks.onPause && this.hooks.onPause());
+
+    // camera sensitivity slider
+    const sensSlider = document.getElementById('cam-sens-slider');
+    if (sensSlider) {
+      const saved = parseFloat(localStorage.getItem('nuar_cam_sens')) || 1.0;
+      sensSlider.value = saved;
+      sensSlider.addEventListener('input', (e) => {
+        const val = parseFloat(e.target.value);
+        if (this.hooks.onCamSens) this.hooks.onCamSens(val);
+      });
+    }
+
     this.mapUI = new MapUI(document.getElementById('map-canvas'), document.getElementById('map-legend'));
   }
 

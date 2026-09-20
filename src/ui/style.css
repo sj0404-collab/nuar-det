@@ -131,16 +131,26 @@ h1 {
 .subtitle { color: var(--fog); font-style: italic; margin: 10px 0 22px; letter-spacing: 1px; font-size: 16px; }
 .story-tease { color: var(--parch); line-height: 1.6; font-size: 15px; max-width: 620px; margin: 0 auto 26px; opacity: 0.9; }
 
-.menu-buttons { display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; }
+.menu-buttons { display: flex; flex-direction: column; gap: 12px; justify-content: center; align-items: center; }
 .menu-btn {
-  padding: 14px 28px; font-size: 16px; font-family: inherit; letter-spacing: 1px; cursor: pointer;
+  width: 280px; padding: 14px 28px; font-size: 16px; font-family: inherit; letter-spacing: 1px; cursor: pointer;
   color: var(--parch); background: rgba(10,16,24,0.7); border: 1px solid rgba(212,165,89,0.5);
-  border-radius: 6px; transition: all 0.15s; pointer-events: auto;
+  border-radius: 6px; transition: all 0.15s; pointer-events: auto; text-align: center;
 }
 .menu-btn:hover { background: rgba(212,165,89,0.18); }
 .menu-btn.primary { background: rgba(176,52,46,0.4); border-color: var(--blood); box-shadow: 0 0 18px rgba(176,52,46,0.3); }
 .menu-btn.primary:hover { background: rgba(176,52,46,0.6); }
 .menu-btn.small { padding: 10px 18px; font-size: 13px; }
+
+.setting-row {
+  width: 280px; display: flex; flex-direction: column; gap: 6px; align-items: center;
+}
+.setting-row label {
+  color: var(--fog); font-size: 13px; text-transform: uppercase; letter-spacing: 1px;
+}
+.setting-row input[type="range"] {
+  width: 100%; accent-color: var(--gold);
+}
 
 .help-list { text-align: left; margin: 18px auto; max-width: 560px; line-height: 1.7; font-size: 14px; color: var(--fog); list-style: none; }
 .help-list li { padding: 6px 0 6px 18px; border-left: 2px solid var(--gold); margin-bottom: 10px; }

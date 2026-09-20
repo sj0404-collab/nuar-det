@@ -14,6 +14,9 @@ export class TouchControls {
     this.onDash = onDash;
     this.onCam = onCam;
 
+    // camera sensitivity (persisted)
+    this.camSensitivity = parseFloat(localStorage.getItem('nuar_cam_sens')) || 1.0;
+
     this.joyPointer = null;
     this.joyCenter = { x: 0, y: 0 };
     this.joyRadius = 52;
@@ -21,6 +24,11 @@ export class TouchControls {
 
     this.active = false;
     this.bindEvents();
+  }
+
+  setCamSensitivity(val) {
+    this.camSensitivity = Math.max(0.2, Math.min(3, val));
+    localStorage.setItem('nuar_cam_sens', this.camSensitivity.toString());
   }
 
   get isTouch() {
@@ -66,7 +74,7 @@ export class TouchControls {
     if (this.camPointer !== e.pointerId) return;
     const dx = e.clientX - this.camLastX;
     this.camLastX = e.clientX;
-    const rate = Math.max(-1, Math.min(1, dx / 50));
+    const rate = Math.max(-1, Math.min(1, dx / 50 * this.camSensitivity));
     if (dx !== 0) this.onCam && this.onCam(rate);
   }
 
