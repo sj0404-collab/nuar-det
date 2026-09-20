@@ -1,0 +1,10 @@
+[
+    {
+        "merged": "com.nuardet.game.app-release-10:/drawable_ic_launcher.xml.flat",
+        "source": "com.nuardet.game.app-main-11:/drawable/ic_launcher.xml"
+    },
+    {
+        "merged": "com.nuardet.game.app-release-10:/xml_file_paths.xml.flat",
+        "source": "com.nuardet.game.app-main-11:/xml/file_paths.xml"
+    }
+]

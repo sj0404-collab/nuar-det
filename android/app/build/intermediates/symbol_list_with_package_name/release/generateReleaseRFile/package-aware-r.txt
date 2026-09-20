@@ -1,0 +1,4 @@
+com.nuardet.game
+drawable ic_launcher
+style AppTheme
+xml file_paths
