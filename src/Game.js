@@ -13,7 +13,9 @@ import { Combat } from './cards/Combat.js';
 import { CARDS, STARTER_DECK, ENCOUNTERS, ENEMIES } from './cards/data.js';
 import { FINAL, ENDINGS } from './story/data.js';
 import { AudioSys } from './audio/AudioSys.js';
-import { makePainterlyMaterial } from './render/Painterly.js';
+import { makePainterlyMaterial, addInkOutline } from './render/Painterly.js';
+import { Effects } from './render/Particles.js';
+import { GlowSprites } from './render/GlowSprites.js';
 
 const ABILITY_KEYS = { dash: 'dash', jump: 'jump', wall: 'wall', lens: 'lens' };
 
@@ -25,7 +27,7 @@ export class Game {
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.shadowMap.enabled = false;
     this.scene = new THREE.Scene();
-    this.scene.fog = new THREE.Fog(0x0b1424, 24, 240);
+    this.scene.fog = new THREE.Fog(0x0f1a2c, 26, 250);
 
     this.camera = new THREE.PerspectiveCamera(62, window.innerWidth / window.innerHeight, 0.1, 1400);
     this.camera.position.set(0, 3, 18);
@@ -39,7 +41,11 @@ export class Game {
 
     this.sky = new SkyDome(this.scene);
 
-    this.player = new Player(this.scene);
+    this.effects = new Effects(this.scene);
+    this.glow = new GlowSprites(this.scene);
+    this.glow.build(this.world);
+
+    this.player = new Player(this.scene, this.effects);
     const coll = this.world.getColliders();
     this.player.setColliders(coll.solids, coll.oneWays);
 
@@ -180,7 +186,10 @@ export class Game {
       if (!locked && g.locked) {
         g.locked = false;
         this.gateColliders = this.gateColliders.filter((c) => c._gateId !== g.id);
-        g.mesh.visible = false;
+        if (g.mesh) {
+          this.effects.bursts.emit(g.mesh.position.clone(), { count: 26, color: { r: 0.8, g: 0.9, b: 1 }, speed: 3.4, spread: 2.2, lift: 2, gravity: 1, size: 0.5 });
+          g.mesh.visible = false;
+        }
         this.audio.sfx('unlock');
         this.hud.toast(`«${g.label}» — путь открыт`);
       } else if (locked && !g.locked) {
@@ -195,20 +204,37 @@ export class Game {
 
   buildItems() {
     for (const it of worldItems(this.world)) {
-      const geo = new THREE.SphereGeometry(0.32, 12, 8);
-      const mat = makePainterlyMaterial(it.color || 0xd4a559, { emission: it.color || 0xd4a559, rimStrength: 0.8 });
+      // high-poly crystal core + ink outline
+      const geo = new THREE.IcosahedronGeometry(0.32, 1);
+      const mat = makePainterlyMaterial(it.color || 0xd4a559, { emission: it.color || 0xd4a559, emissionBias: 0.9, rimStrength: 0.8 });
       const mesh = new THREE.Mesh(geo, mat);
       mesh.position.set(it.pos.x, it.pos.y, it.pos.z);
+      addInkOutline(mesh, { thickness: 0.02, opacity: 0.7 });
       this.scene.add(mesh);
       const halo = new THREE.Mesh(
-        new THREE.RingGeometry(0.4, 0.62, 20),
+        new THREE.RingGeometry(0.4, 0.62, 24),
         new THREE.MeshBasicMaterial({ color: it.color || 0xffe6a0, transparent: true, opacity: 0.65, side: THREE.DoubleSide })
       );
       halo.rotation.x = -Math.PI / 2;
       halo.position.set(it.pos.x, it.pos.y + 0.05, it.pos.z);
       this.scene.add(halo);
+      // rotating orbit ring
+      const ring = new THREE.Mesh(
+        new THREE.TorusGeometry(0.5, 0.02, 6, 24),
+        new THREE.MeshBasicMaterial({ color: it.color || 0xffe6a0, transparent: true, opacity: 0.5 })
+      );
+      ring.rotation.x = Math.PI / 2;
+      ring.position.set(it.pos.x, it.pos.y, it.pos.z);
+      this.scene.add(ring);
+      // orbiting glint
+      const glintMat = makePainterlyMaterial(it.color || 0xffffff, { emission: it.color || 0xffffff, emissionBias: 1.2 });
+      const glint = new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 8), glintMat);
+      glint.position.set(it.pos.x, it.pos.y, it.pos.z);
+      this.scene.add(glint);
       it.mesh = mesh;
       it.halo = halo;
+      it.ring = ring;
+      it.glint = glint;
       it.taken = false;
     }
   }
@@ -216,37 +242,91 @@ export class Game {
   buildChests() {
     for (const c of this.world.chests) {
       const g = new THREE.Group();
-      const box = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.7, 0.6));
-      box.material = makePainterlyMaterial(0x6b4a32, { rimStrength: 0.4 });
-      box.position.y = 0.35;
-      const lid = new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.18, 0.65));
-      lid.material = makePainterlyMaterial(0x8a5a3a);
-      lid.position.y = 0.72;
-      const trim = new THREE.Mesh(new THREE.BoxGeometry(0.98, 0.1, 0.62));
-      trim.material = makePainterlyMaterial(0xd4a559, { emission: 0x8f6a2e });
-      trim.position.y = 0.62;
-      g.add(box, lid, trim);
+      const woodMat = makePainterlyMaterial(0x6b4a32, { rimStrength: 0.5 });
+      const darkWoodMat = makePainterlyMaterial(0x4a3322, { rimStrength: 0.4 });
+      const goldMat = makePainterlyMaterial(0xd4a559, { emission: 0xd4a559, emissionBias: 0.8, rimStrength: 0.4 });
+
+      // base
+      const box = new THREE.Mesh(new THREE.BoxGeometry(0.92, 0.62, 0.62), woodMat);
+      box.position.y = 0.34;
+      addInkOutline(box, { thickness: 0.02, opacity: 0.8 });
+      g.add(box);
+      // metal corner bands
+      for (const sx of [-1, 1]) {
+        const band = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.6, 0.64), goldMat);
+        band.position.set(sx * 0.42, 0.35, 0);
+        g.add(band);
+      }
+      // hinged lid (pivot at the back edge for the open animation)
+      const pivot = new THREE.Group();
+      pivot.position.set(0, 0.66, -0.32);
+      const lid = new THREE.Mesh(new THREE.BoxGeometry(0.98, 0.2, 0.68), darkWoodMat);
+      lid.geometry.translate(0, 0.02, -0.05);
+      lid.position.y = 0.1;
+      addInkOutline(lid, { thickness: 0.02, opacity: 0.8 });
+      pivot.add(lid);
+      // rounded lid crest
+      const crest = new THREE.Mesh(new THREE.CylinderGeometry(0.36, 0.4, 0.16, 18), darkWoodMat);
+      crest.position.y = 0.18;
+      pivot.add(crest);
+      // gold hasp
+      const hasp = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.12, 0.1), goldMat);
+      hasp.position.set(0, 0.06, 0.3);
+      pivot.add(hasp);
+      g.add(pivot);
+      // front lock plate
+      const lock = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 0.06, 12), goldMat);
+      lock.rotation.x = Math.PI / 2;
+      lock.position.set(0, 0.36, 0.34);
+      g.add(lock);
       g.position.set(c.pos.x, c.pos.y, c.pos.z);
       this.scene.add(g);
       c.mesh = g;
+      c.pivot = pivot;
+      c.lid = lid;
+      c.lock = lock;
       c.opened = false;
     }
   }
 
   buildNpcs() {
     for (const n of this.world.npcs) {
+      // small 3D figure so characters read in the world
+      const figure = new THREE.Group();
+      const coatMat = makePainterlyMaterial(0x3a3336, { rimStrength: 0.55 });
+      const skinMat = makePainterlyMaterial(0xd8c9ae, { rimStrength: 0.3 });
+      const hatMat = makePainterlyMaterial(0x262b33, { rimStrength: 0.4 });
+      const body = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.28, 0.9, 14), coatMat);
+      body.position.y = 0.45;
+      addInkOutline(body, { thickness: 0.016, opacity: 0.75 });
+      const head = new THREE.Mesh(new THREE.SphereGeometry(0.14, 14, 10), skinMat);
+      head.position.y = 1.05;
+      addInkOutline(head, { thickness: 0.015, opacity: 0.7 });
+      const brim = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.24, 0.04, 16), hatMat);
+      brim.position.y = 1.24;
+      const crown = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.15, 0.14, 14), hatMat);
+      crown.position.y = 1.31;
+      figure.add(body, head, brim, crown);
+      // slouched idle
+      figure.rotation.x = 0.08;
+      figure.position.set(n.pos.x, n.pos.y + 0.1, n.pos.z);
+      figure.rotation.y = Math.atan2(-this.checkpoint.x + n.pos.x, -this.checkpoint.z + n.pos.z) || 0;
+      this.scene.add(figure);
+      n.figure = figure;
+      n.bobPhase = Math.random() * Math.PI * 2;
+
       const sprite = this.makeTextSprite(n.face, 64, n.face.length > 2 ? '#5bc0c0' : null);
-      sprite.position.set(n.pos.x, n.pos.y + (n.room === 'cistern' ? 0 : 1.7), n.pos.z);
+      sprite.position.set(n.pos.x, n.pos.y + (n.room === 'cistern' ? 2.1 : 1.7), n.pos.z);
       this.scene.add(sprite);
       const label = this.makeTextSprite(n.name, 34, '#e9dcc0');
-      label.position.set(n.pos.x, n.pos.y + (n.room === 'cistern' ? 2.0 : 2.3), n.pos.z);
+      label.position.set(n.pos.x, n.pos.y + (n.room === 'cistern' ? 2.4 : 2.3), n.pos.z);
       this.scene.add(label);
       n.sprite = sprite;
       n.label = label;
-      // small light pool at each npc
+      // warm light pool
       const light = new THREE.Mesh(
-        new THREE.PlaneGeometry(1.6, 1.6),
-        new THREE.MeshBasicMaterial({ color: 0xffcf8a, transparent: true, opacity: 0.08, depthWrite: false })
+        new THREE.PlaneGeometry(2.2, 2.2),
+        new THREE.MeshBasicMaterial({ color: 0xffcf8a, transparent: true, opacity: 0.1, depthWrite: false })
       );
       light.rotation.x = -Math.PI / 2;
       light.position.set(n.pos.x, 0.02, n.pos.z);
@@ -266,17 +346,29 @@ export class Game {
           enemyId: econf.enemy, zone, x: sp[0], z: sp[1],
           baseX: sp[0], baseZ: sp[1], aggro: false, dead: false,
         };
-        const geo = new THREE.SphereGeometry(0.65, 10, 8);
-        const mat = new THREE.MeshBasicMaterial({ color: 0x3a2d2d, transparent: true, opacity: 0.6 });
-        const mesh = new THREE.Mesh(geo, mat);
-        mesh.position.set(w.x, 1.6, w.z);
-        const glow = new THREE.Mesh(
-          new THREE.SphereGeometry(0.85, 8, 6),
-          new THREE.MeshBasicMaterial({ color: 0x9a3a3a, transparent: true, opacity: 0.16 })
-        );
-        mesh.add(glow);
-        this.scene.add(mesh);
-        w.mesh = mesh;
+        // wisp nest: spiked core + orbiting motes + aura shell
+        const g = new THREE.Group();
+        const coreMat = makePainterlyMaterial(0x4a2a2a, { emission: 0x7a3030, emissionBias: 0.85, rimStrength: 0.5 });
+        const core = new THREE.Mesh(new THREE.IcosahedronGeometry(0.38, 1), coreMat);
+        addInkOutline(core, { thickness: 0.02, opacity: 0.75 });
+        g.add(core);
+        const shellMat = new THREE.MeshBasicMaterial({ color: 0x9a3a3a, transparent: true, opacity: 0.18, side: THREE.DoubleSide });
+        const shell = new THREE.Mesh(new THREE.SphereGeometry(0.8, 16, 12), shellMat);
+        shell.position.y = 0.3;
+        g.add(shell);
+        const motes = [];
+        for (let m = 0; m < 3; m++) {
+          const moteMat = makePainterlyMaterial(0xcf6a6a, { emission: 0xcf4444, emissionBias: 1.1 });
+          const mote = new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 8), moteMat);
+          g.add(mote);
+          motes.push({ mesh: mote, phase: (m / 3) * Math.PI * 2 });
+        }
+        g.position.set(w.x, 1.6, w.z);
+        this.scene.add(g);
+        w.mesh = g;
+        w.core = core;
+        w.shell = shell;
+        w.motes = motes;
         this.wisps.push(w);
       }
     }
@@ -461,6 +553,9 @@ export class Game {
         it.taken = true;
         it.mesh.visible = false;
         it.halo.visible = false;
+        it.ring.visible = false;
+        it.glint.visible = false;
+        this.effects.itemGather(new THREE.Vector3(it.pos.x, it.pos.y, it.pos.z));
         this.player.inventory.add(it.key || it.id);
         this.audio.sfx('unlock');
         this.hud.toast(`Получено: ${it.label}`);
@@ -475,7 +570,9 @@ export class Game {
       const dx = p.x - c.pos.x, dz = p.z - c.pos.z;
       if (dx * dx + dz * dz < 5 && Math.abs(p.y - c.pos.y) < 3.5) {
         c.opened = true;
-        c.mesh.position.y -= 0.4;
+        c.openT = 0;
+        c.animating = true;
+        this.effects.chestSparkle(new THREE.Vector3(c.pos.x, c.pos.y + 0.7, c.pos.z));
         this.audio.sfx('chest');
         let txt = `Сундук: ${c.label}.`;
         for (const item of c.contents) {
@@ -535,8 +632,13 @@ export class Game {
         }
       }
       this.player.hp = Math.min(this.player.maxHp, this.state.hp + 18);
-      if (this.activeWisp) { this.activeWisp.dead = true; }
-      else this.bossDefeated = true;
+      if (this.activeWisp) {
+        this.activeWisp.dead = true;
+        this.effects.bursts.emit(this.activeWisp.mesh.position.clone(), { count: 34, color: { r: 0.9, g: 0.45, b: 0.35 }, speed: 4.5, spread: 1.8, lift: 3, gravity: 1.5, size: 0.55 });
+      } else {
+        this.bossDefeated = true;
+        this.effects.bursts.emit(new THREE.Vector3(-10, 2, -216), { count: 80, color: { r: 1, g: 0.5, b: 0.3 }, speed: 6, spread: 4, lift: 4, gravity: 2, size: 0.7 });
+      }
       this.audio.sfx('unlock');
       this.hud.toast('Победа! Туман отступает.');
     } else {
@@ -594,8 +696,12 @@ export class Game {
   }
 
   update(dt) {
-    this.sky.update(this.clock.elapsedTime);
-    this.world.updateFog(this.clock.elapsedTime);
+    const t = this.clock.elapsedTime;
+    this.sky.update(t);
+    this.world.updateFog(t);
+    this.effects.update(dt, t, this.camera.position);
+    this.glow.update(t);
+    this.effects.rain.points.visible = this.player.pos.y > -5;
 
     if (this.mode === 'ending') {
       this.driftCamera(dt);
@@ -729,6 +835,7 @@ export class Game {
 
   updateWisps(dt) {
     const p = this.player.pos;
+    const t = this.clock.elapsedTime;
     for (const w of this.wisps) {
       if (w.dead) {
         w.mesh.visible = false;
@@ -743,13 +850,24 @@ export class Game {
         w.x += (dx / Math.max(dist, 0.01)) * sp * dt * (dist > 1.4 ? 1 : 0.2);
         w.z += (dz / Math.max(dist, 0.01)) * sp * dt * (dist > 1.4 ? 1 : 0.2);
       } else {
-        w.x = w.baseX + Math.sin(this.clock.elapsedTime * 0.6 + w.baseZ) * 3;
-        w.z = w.baseZ + Math.cos(this.clock.elapsedTime * 0.5 + w.baseX) * 3;
+        w.x = w.baseX + Math.sin(t * 0.6 + w.baseZ) * 3;
+        w.z = w.baseZ + Math.cos(t * 0.5 + w.baseX) * 3;
       }
       w.mesh.position.x = w.x;
       w.mesh.position.z = w.z;
-      w.mesh.position.y = 1.6 + Math.sin(this.clock.elapsedTime * 2 + w.baseX) * 0.3;
-      w.mesh.rotation.y += dt;
+      w.mesh.position.y = 1.6 + Math.sin(t * 2 + w.baseX) * 0.3;
+      w.mesh.rotation.y += dt * 1.4;
+      // orbiting motes
+      for (let m = 0; m < w.motes.length; m++) {
+        const mo = w.motes[m];
+        const a = t * 2.6 + mo.phase;
+        mo.mesh.position.set(Math.cos(a) * 0.72, Math.sin(a * 1.3) * 0.45 + 0.25, Math.sin(a) * 0.72);
+      }
+      // core pulse
+      const pulse = 1 + Math.sin(t * 4 + w.baseX) * 0.08;
+      w.core.scale.set(pulse, pulse, pulse);
+      w.shell.material.opacity = 0.14 + Math.sin(t * 3 + w.baseZ) * 0.06;
+      w.shell.scale.set(1 + Math.sin(t * 2.2 + w.baseX) * 0.08, 1, 1 + Math.sin(t * 2.2 + w.baseX) * 0.08);
       if (dist < 1.3 && !this.combat) {
         this.startCombat(w.enemyId, w);
       }
@@ -763,6 +881,7 @@ export class Game {
     if (p.x > -40 && p.x < 20 && p.z < -196 && p.z > -240 && p.y > -6) {
       this.bossSpawned = true;
       this.hud.toast('Магма-Морок пробуждается из саркофага!');
+      this.effects.bursts.emit(new THREE.Vector3(-10, 2, -228), { count: 46, color: { r: 1, g: 0.4, b: 0.22 }, speed: 5, spread: 3, lift: 3, gravity: 1, size: 0.65 });
       setTimeout(() => this.startCombat('boss', null), 900);
     }
   }
@@ -773,12 +892,40 @@ export class Game {
       if (it.taken) continue;
       it.mesh.position.y = it.pos.y + Math.sin(t * 2 + it.pos.x) * 0.18;
       it.mesh.rotation.y += dt * 1.4;
+      it.ring.rotation.z = t * 1.6;
+      it.ring.position.y = it.pos.y + Math.sin(t * 2 + it.pos.x) * 0.18;
+      const ga = t * 2.4;
+      it.glint.position.set(
+        it.pos.x + Math.cos(ga) * 0.62,
+        it.pos.y + 0.18 + Math.sin(ga * 1.3) * 0.2,
+        it.pos.z + Math.sin(ga) * 0.62
+      );
+      it.halo.material.opacity = 0.55 + Math.sin(t * 3 + it.pos.x) * 0.15;
       it.halo.rotation.z = t;
     }
     for (const c of this.world.chests) {
-      if (!c.opened) c.mesh.rotation.y = Math.sin(t * 1.2 + c.pos.x) * 0.12;
+      if (c.opened) {
+        if (c.animating) {
+          c.openT += dt;
+          const k = Math.min(1, c.openT / 0.5);
+          const ease = 1 - Math.pow(1 - k, 3);
+          c.pivot.rotation.x = -ease * 1.35;
+          if (k >= 1) {
+            c.animating = false;
+            c.lock.visible = false;
+          }
+        }
+        continue;
+      }
+      c.mesh.rotation.y = Math.sin(t * 1.2 + c.pos.x) * 0.1;
+      // gold lock breathes
+      const lockMat = c.lock.material;
+      if (lockMat && lockMat.uniforms) lockMat.uniforms.uEmissiveBias.value = 0.6 + Math.sin(t * 3 + c.pos.x) * 0.4;
     }
-    // camera-relative light? skip
+    for (const n of this.world.npcs) {
+      n.figure.position.y = n.pos.y + 0.1 + Math.sin(t * 1.1 + n.bobPhase) * 0.04;
+      n.figure.rotation.y += Math.sin(t * 0.4 + n.bobPhase) * 0.002;
+    }
   }
 
   onResize() {

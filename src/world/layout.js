@@ -169,9 +169,10 @@ function buildCistern(mk, world) {
   pave(r, pal, 110, 166, -28, 96, cy);    // wide ledge north
   r.region(90, 186, -120, 20, -120, 60);
 
-  // water glow
-  r.decoBox(0x1f8f94, 138, cy + 0.6, -44, 66, 0.1, 74);
-  r.decoBox(0x2ea8a0, 138, cy + 0.9, -44, 60, 0.1, 68);
+  // water glow (emissive so it reads in the dark)
+  r.decoBox(0x1f8f94, 138, cy + 0.6, -44, 66, 0.1, 74, { emission: 0x0e5a5c, emissionBias: 0.8 });
+  r.decoBox(0x2ea8a0, 138, cy + 0.9, -44, 60, 0.1, 68, { emission: 0x1e7e78, emissionBias: 0.9 });
+  r.decoBox(0x7ef0e0, 138, cy + 1.1, -44, 24, 0.05, 28, { emission: 0x9ffcee, emissionBias: 0.85 });
 
   // walls
   r.box(pal.wall, 96, cy + 8, -44, 3, 18, 92);

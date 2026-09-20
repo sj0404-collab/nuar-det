@@ -96,22 +96,38 @@ class Room {
   // lamp post
   lamp(x, z) {
     const group = new THREE.Group();
-    const pole = new THREE.CylinderGeometry(0.09, 0.09, 3.4, 6);
-    const poleMat = makePainterlyMaterial(0x1a1f26, { emission: 0x000000 });
+    // tapered post + base plate
+    const baseMat = makePainterlyMaterial(0x171c22, { rimStrength: 0.3 });
+    const base = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.3, 0.18, 12), baseMat);
+    base.position.set(x, 0.12, z);
+    group.add(base);
+    const pole = new THREE.CylinderGeometry(0.07, 0.1, 3.1, 10);
+    const poleMat = makePainterlyMaterial(0x1a1f26);
     const poleMesh = new THREE.Mesh(pole, poleMat);
-    poleMesh.position.set(x, 1.7, z);
+    poleMesh.position.set(x, 1.75, z);
     group.add(poleMesh);
-    const head = new THREE.CylinderGeometry(0.3, 0.34, 0.5, 8);
-    const headMat = makePainterlyMaterial(0x2a2f36, { emission: 0xffcf6a, rimStrength: 0.2 });
-    const headMesh = new THREE.Mesh(head, headMat);
-    headMesh.position.set(x, 3.55, z);
-    group.add(headMesh);
-    const globe = new THREE.SphereGeometry(0.16, 8, 6);
-    const globeMat = makePainterlyMaterial(0xffcf8a, { emission: 0xffb54a, rimStrength: 0.2 });
+    // lantern head with cage
+    const headMat = makePainterlyMaterial(0x2a2f36, { rimStrength: 0.25 });
+    const cap = new THREE.Mesh(new THREE.ConeGeometry(0.3, 0.42, 10), headMat);
+    cap.position.set(x, 3.95, z);
+    group.add(cap);
+    const cage = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.3, 0.62, 10, 1, true), headMat);
+    cage.position.set(x, 3.58, z);
+    group.add(cage);
+    // glowing globe + inner flame
+    const globe = new THREE.SphereGeometry(0.19, 14, 10);
+    const globeMat = makePainterlyMaterial(0xffcf8a, { emission: 0xffb54a, emissionBias: 1.0, rimStrength: 0.1 });
     const globeMesh = new THREE.Mesh(globe, globeMat);
-    globeMesh.position.set(x, 3.55, z);
+    globeMesh.position.set(x, 3.58, z);
+    globeMesh.scale.set(1, 1.25, 1);
     group.add(globeMesh);
+    const flameMat = makePainterlyMaterial(0xfff3c0, { emission: 0xffe0a0, emissionBias: 1.4 });
+    const flame = new THREE.Mesh(new THREE.SphereGeometry(0.08, 10, 8), flameMat);
+    flame.position.set(x, 3.55, z);
+    group.add(flame);
+    group.userData.glow = { x, z, y: 3.58 };
     this.w.meshes.push({ mesh: group, room: this.id, lit: true });
+    this.w.lamps.push({ x, z, y: 3.58 });
     return this;
   }
 
@@ -146,6 +162,7 @@ export class World {
     this.npcs = [];
     this.gates = [];
     this.chests = [];
+    this.lamps = [];
     this.roomInfo = {};
     this.fogSprites = [];
     this.roomList = [];
@@ -205,28 +222,28 @@ export class World {
     c.width = 128; c.height = 128;
     const ctx = c.getContext('2d');
     const grad = ctx.createRadialGradient(64, 64, 8, 64, 64, 60);
-    grad.addColorStop(0, 'rgba(160,180,200,0.55)');
-    grad.addColorStop(0.5, 'rgba(160,180,200,0.28)');
+    grad.addColorStop(0, 'rgba(160,180,200,0.6)');
+    grad.addColorStop(0.5, 'rgba(160,180,200,0.3)');
     grad.addColorStop(1, 'rgba(160,180,200,0)');
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, 128, 128);
     const tex = new THREE.CanvasTexture(c);
     const smat = new THREE.SpriteMaterial({
       map: tex, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
-      opacity: 0.5, fog: true,
+      opacity: 0.55, fog: true,
     });
-    const cloudCount = 36;
-    const positions = [];
-    // spread puffs across map bounds
+    const cloudCount = 42;
+    // spread puffs across map bounds, heavier in cistern/plaza zones
     for (let i = 0; i < cloudCount; i++) {
       const x = (Math.random() * 2 - 1) * 260;
       const z = (Math.random() * 2 - 1) * 220;
       const s = new THREE.Sprite(smat.clone());
-      const scale = 18 + Math.random() * 34;
-      s.scale.set(scale, scale * 0.35, 1);
-      s.position.set(x, 0.8 + Math.random() * 1.4, z);
+      const scale = 20 + Math.random() * 38;
+      s.scale.set(scale, scale * (0.32 + Math.random() * 0.18), 1);
+      s.material.opacity = 0.4 + Math.random() * 0.3;
+      s.position.set(x, 0.8 + Math.random() * 1.6, z);
       this.scene.add(s);
-      this.fogSprites.push({ s, base: 0.8 + Math.random() * 1.4, speed: 0.2 + Math.random() * 0.4, phase: Math.random() * 10 });
+      this.fogSprites.push({ s, base: 0.8 + Math.random() * 1.6, speed: 0.18 + Math.random() * 0.4, phase: Math.random() * 10 });
     }
   }
 

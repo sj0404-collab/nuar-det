@@ -6,13 +6,16 @@ function buildPainterlyShader() {
       uColor: { value: new THREE.Color(0x8a8f98) },
       uEmission: { value: new THREE.Color(0x000000) },
       uEmissiveBias: { value: 0.0 },
-      uLightDir: { value: new THREE.Vector3(0.4, 0.8, 0.35).normalize() },
+      uLightDir: { value: new THREE.Vector3(0.42, 0.82, 0.32).normalize() },
       uLightColor: { value: new THREE.Color(0xffe6c0) },
-      uAmbient: { value: new THREE.Color(0x141b28) },
+      uAmbient: { value: new THREE.Color(0x18223a) },
+      uFill: { value: new THREE.Color(0x354a6e) },
       uRimColor: { value: new THREE.Color(0x4a86b8) },
-      uRimPower: { value: 2.2 },
+      uRimPower: { value: 2.4 },
       uRimStrength: { value: 0.5 },
+      uSpecular: { value: new THREE.Color(0xfff2d8) },
       uTint: { value: new THREE.Color(0xffffff) },
+      uGrain: { value: 0.035 },
     },
     vertexShader: `
       varying vec3 vNormal;
@@ -34,10 +37,13 @@ function buildPainterlyShader() {
       uniform vec3 uLightDir;
       uniform vec3 uLightColor;
       uniform vec3 uAmbient;
+      uniform vec3 uFill;
       uniform vec3 uRimColor;
       uniform float uRimPower;
       uniform float uRimStrength;
+      uniform vec3 uSpecular;
       uniform vec3 uTint;
+      uniform float uGrain;
       uniform vec3 fogColor;
       uniform float fogNear;
       uniform float fogFar;
@@ -49,24 +55,49 @@ function buildPainterlyShader() {
         return smoothstep(a, b, v);
       }
 
+      // cheap stylised noise, stable per fragment
+      float grainNoise(vec2 p) {
+        return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453);
+      }
+
       void main() {
         vec3 N = normalize(vNormal);
         vec3 L = normalize(uLightDir);
         vec3 V = normalize(vView);
-        float diff = dot(N, L);
-        // painterly stepped lighting
-        float s = stepify(diff, 0.32, 0.5) * 0.55
-                + stepify(diff, 0.55, 0.8) * 0.35
-                + stepify(diff, 0.85, 1.0) * 0.18;
-        s = clamp(s, 0.0, 1.0) * 0.9 + 0.1;
+        vec3 H = normalize(L + V);
+
+        float d = dot(N, L);
+
+        // three distinct abraded-paint bands + a soft mid-tone fill
+        float band = 0.0;
+        band += stepify(d, 0.14, 0.30) * 0.32;
+        band += stepify(d, 0.33, 0.54) * 0.34;
+        band += stepify(d, 0.57, 0.80) * 0.30;
+        float s = 0.10 + band;
+
         vec3 base = uColor * uTint;
         vec3 col = base * (uLightColor * s + uAmbient);
-        // soft toon band artifact break
-        col = mix(col, base, 0.08);
-        // rim
+
+        // painterly: pull light back toward the local pigment so bands stay readable
+        col = mix(col, base * (uAmbient * 2.2), 0.06);
+
+        // cool secondary fill from below (night city bounce light)
+        col += base * uFill * (1.0 - clamp(d, -0.3, 0.6)) * 0.22;
+
+        // soft specular lick
+        float spec = pow(max(dot(N, H), 0.0), 28.0) * stepify(d, 0.1, 0.25);
+        col += uSpecular * spec * 0.28;
+
+        // rim halo
         float rim = pow(1.0 - clamp(dot(N, V), 0.0, 1.0), uRimPower);
         col += uRimColor * rim * uRimStrength;
+
+        // emissive glow (fixed: bias defaults on when emission supplied)
         col += uEmission * uEmissiveBias;
+
+        // paint grain: keeps large merged surfaces from looking plastic
+        col += (grainNoise(gl_FragCoord.xy) - 0.5) * uGrain * (1.0 - uEmissiveBias);
+
         // fog
         float fogF = smoothstep(fogNear, fogFar, length(vWorld - cameraPosition));
         col = mix(col, fogColor, fogF);
@@ -86,21 +117,51 @@ export function makePainterlyMaterial(color, opts = {}) {
     fog: true,
   });
   mat.uniforms.uColor.value.set(color);
-  if (opts.emission) mat.uniforms.uEmission.value.set(opts.emission);
+  if (opts.emission) {
+    mat.uniforms.uEmission.value.set(opts.emission);
+    mat.uniforms.uEmissiveBias.value = opts.emissionBias !== undefined ? opts.emissionBias : 1.0;
+  }
+  if (opts.emissionBias !== undefined && !opts.emission) {
+    mat.uniforms.uEmissiveBias.value = opts.emissionBias;
+  }
   if (opts.rimStrength !== undefined) mat.uniforms.uRimStrength.value = opts.rimStrength;
   if (opts.rimColor) mat.uniforms.uRimColor.value.set(opts.rimColor);
+  if (opts.rimPower !== undefined) mat.uniforms.uRimPower.value = opts.rimPower;
+  if (opts.fill) mat.uniforms.uFill.value.set(opts.fill);
   if (opts.tint) mat.uniforms.uTint.value.set(opts.tint);
-  // fog uniforms matching the scene Fog(0x0b1424, 24, 240)
-  mat.uniforms.fogColor = { value: new THREE.Color(0x0b1424) };
+  mat.uniforms.fogColor = { value: new THREE.Color(0x0f1a2c) };
   mat.uniforms.fogNear = { value: 24 };
   mat.uniforms.fogFar = { value: 240 };
   return mat;
 }
 
-export function makeStandardMaterial(color, opts = {}) {
-  const mat = new THREE.MeshToonMaterial({ color, gradientMap: null });
-  mat.color.set(color);
-  return mat;
-}
+// Painterly "ink" outline: an inverted-hull shell that hugs the mesh. Use on
+// characters and interactive props to give them a storybook edge.
+// opts: { color, thickness, opacity }
+export function addInkOutline(mesh, opts = {}) {
+  const color = opts.color || 0x0a0a0f;
+  const thickness = opts.thickness || 0.012;
+  const opacity = opts.opacity !== undefined ? opts.opacity : 1.0;
 
-export function gear(euler, THREE_) { return new THREE_.Euler(euler.x, euler.y, euler.z); }
+  const geo = mesh.geometry.clone();
+  geo.computeVertexNormals();
+  const pos = geo.attributes.position;
+  const nor = geo.attributes.normal;
+  const verts = pos.array;
+  const norms = nor.array;
+  for (let i = 0; i < verts.length; i += 3) {
+    verts[i] += norms[i] * thickness;
+    verts[i + 1] += norms[i + 1] * thickness;
+    verts[i + 2] += norms[i + 2] * thickness;
+  }
+  const mat = new THREE.MeshBasicMaterial({
+    color, transparent: opacity < 1, opacity, side: THREE.BackSide,
+    depthWrite: false,
+  });
+  const shell = new THREE.Mesh(geo, mat);
+  shell.renderOrder = -1;
+  // share parent transforms
+  mesh.add(shell);
+  shell.position.set(0, 0, 0);
+  return shell;
+}

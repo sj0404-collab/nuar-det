@@ -138,9 +138,11 @@ function buildHarbor(mk, world) {
   r.box(0x222b33, 232, 3.6, 188, 11, 5, 12);
   r.box(0x222b33, 232, 5.2, 188, 1.2, 1.4, 10);
 
-  // masts
+  // masts + rigging + stern lantern
   r.decoBox(0x1d1f24, 226, 9, 118, 0.3, 15, 0.3);
   r.decoBox(0x1d1f24, 214, 10, 126, 0.3, 17, 0.3);
+  r.decoBox(0xdfe6ec, 214, 10, 126, 0.05, 17, 0.05);
+  r.decoBox(0xffcf8a, 226, 16.5, 118, 0.5, 0.5, 0.5, { emission: 0xffb54a, emissionBias: 1.1 });
 
   // warehouses + tavern
   building(r, pal, 208, 70, 22, 13, 9, { windows: true });
@@ -180,8 +182,11 @@ function buildMausoleum(mk, world) {
   r.oneWay(-10, 5.5, -210, 24, 18, COLORS.goldDark);   // altar ledge
   pillar(r, pal.wall, -34, -202, 12, 0, 1.5, { cap: COLORS.gold });
   pillar(r, pal.wall, 14, -202, 12, 0, 1.5, { cap: COLORS.gold });
-  // battle arena ring
-  r.decoBox(0x4d1a2a, -10, 0.35, -216, 34, 0.16, 28);
+  // battle arena ring + summoning runes (emissive so the arena reads)
+  r.decoBox(0x4d1a2a, -10, 0.35, -216, 34, 0.16, 28, { emission: 0x5a1f30, emissionBias: 0.9 });
+  r.decoBox(0x8f4b3f, -10, 0.15, -216, 8, 0.1, 8, { emission: 0x8f3f33, emissionBias: 1.0 });
+  r.decoBox(0x9a4a3a, -34, 0.16, -202, 2.4, 0.12, 0.9, { emission: 0x9a4a3a, emissionBias: 0.85 });
+  r.decoBox(0x9a4a3a, 16, 0.16, -202, 2.4, 0.12, 0.9, { emission: 0x9a4a3a, emissionBias: 0.85 });
   r.oneWay(-10, 5, -216, 34, 26, COLORS.goldDark);
   // sarcophagus + ritual circle
   r.decoBox(0x3a3238, -10, 1, -228, 3.2, 1.5, 1.9);
@@ -189,8 +194,9 @@ function buildMausoleum(mk, world) {
   r.decoBox(0x8f4b3f, -10, 0.15, -216, 8, 0.1, 8);
   // gargoyle lamps
   for (const [lx, lz] of [[-30, -206], [-2, -206]]) {
-    r.decoBox(0x2a2530, lx, 3.2, lz, 0.9, 5.6, 0.9);
-    r.decoBox(0xffb45a, lx, 6.2, lz, 0.7, 0.55, 0.7);
+    r.box(0x2a2530, lx, 3.2, lz, 0.9, 5.6, 0.9);
+    r.decoBox(0x241f2b, lx, 3.9, lz + 0.5, 0.7, 1.2, 0.3);
+    r.decoBox(0xffb45a, lx, 6.2, lz, 0.7, 0.55, 0.7, { emission: 0xff8a2a, emissionBias: 1.0 });
   }
 
   // side rooms/corridors with loot

@@ -6,8 +6,8 @@ export class SkyDome {
     const geo = new THREE.SphereGeometry(900, 32, 20);
     const uniforms = {
       uTop: { value: new THREE.Color(0x0a1220) },
-      uMid: { value: new THREE.Color(0x24344a) },
-      uHor: { value: new THREE.Color(0x5b3a33) },
+      uMid: { value: new THREE.Color(0x2c4056) },
+      uHor: { value: new THREE.Color(0x70463a) },
       uGlowY: { value: new THREE.Color(0xd4a559).multiplyScalar(1.4) },
     };
     const mat = new THREE.ShaderMaterial({
