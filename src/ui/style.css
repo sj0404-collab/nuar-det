@@ -76,6 +76,14 @@ canvas#game-canvas { position: absolute; inset: 0; width: 100%; height: 100%; di
   position: absolute; left: 39px; top: 39px; width: 40px; height: 40px; border-radius: 50%;
   background: rgba(212,165,89,0.75); box-shadow: 0 0 14px rgba(212,165,89,0.5);
 }
+#cam-zone {
+  position: absolute; right: 0; bottom: 0; width: 50%; height: 100%;
+  pointer-events: auto; touch-action: none;
+}
+#cam-label {
+  position: absolute; right: 44px; top: 28px; font-size: 22px; color: rgba(233,220,192,0.32);
+  pointer-events: none; user-select: none;
+}
 #act-buttons { position: absolute; right: 22px; bottom: 66px; display: flex; gap: 18px; pointer-events: auto; align-items: flex-end; }
 .act-btn {
   width: 74px; height: 74px; border-radius: 50%; font-size: 30px; cursor: pointer; color: var(--parch);

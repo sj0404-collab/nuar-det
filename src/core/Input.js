@@ -13,6 +13,7 @@ export class Input {
     this.mapPressed = false;
     this.pausePressed = false;
     this.camHeld = 0;
+    this.camRate = 0;
 
     this.bind();
     if (this.touch) {
@@ -21,6 +22,9 @@ export class Input {
           this.moveX = x;
           this.moveZ = y;
         }
+      };
+      this.touch.onCam = (rate) => {
+        if (this.usingTouch) this.camRate = rate;
       };
       this.touch.onJump = (down) => {
         if (this.usingTouch) {
@@ -61,7 +65,7 @@ export class Input {
       if (k === 'q' || k === 'й') { if (this.camHeld === -1) this.camHeld = 0; }
       if (k === 'e' || k === 'л') { if (this.camHeld === 1) this.camHeld = 0; }
     });
-    window.addEventListener('blur', () => { this.keys.clear(); this.jumpHeld = false; this.camHeld = 0; });
+    window.addEventListener('blur', () => { this.keys.clear(); this.jumpHeld = false; this.camHeld = 0; this.camRate = 0; });
   }
 
   axis2D() {

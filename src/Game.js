@@ -750,7 +750,7 @@ export class Game {
 
   updateCamera(dt) {
     const p = this.player;
-    const cam = this.input.camHeld;
+    const cam = this.input.camHeld !== 0 ? this.input.camHeld : this.input.camRate;
     if (cam !== 0) this.cameraYaw += cam * 2.7 * dt;
     const dist = 9;
     const hy = 3.1;

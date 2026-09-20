@@ -1,9 +1,10 @@
 export class TouchControls {
-  constructor(canvas, onMove, onJump, onDash) {
+  constructor(canvas, onMove, onJump, onDash, onCam = () => {}) {
     this.el = document.getElementById('touch-controls');
     this.joyZone = document.getElementById('joy-zone');
     this.joyBase = document.getElementById('joy-base');
     this.joyThumb = document.getElementById('joy-thumb');
+    this.camZone = document.getElementById('cam-zone');
     this.btnJump = document.getElementById('btn-jump');
     this.btnDash = document.getElementById('btn-dash');
     this.btnInteract = document.getElementById('btn-interact');
@@ -11,6 +12,7 @@ export class TouchControls {
     this.onMove = onMove;
     this.onJump = onJump;
     this.onDash = onDash;
+    this.onCam = onCam;
 
     this.joyPointer = null;
     this.joyCenter = { x: 0, y: 0 };
@@ -43,6 +45,35 @@ export class TouchControls {
     this.joyZone.addEventListener('pointermove', (e) => this.moveJoy(e));
     this.joyZone.addEventListener('pointerup', (e) => this.endJoy(e));
     this.joyZone.addEventListener('pointercancel', () => this.endJoy(null));
+
+    this.camPointer = null;
+    this.camLastX = 0;
+    this.camZone.addEventListener('pointerdown', (e) => this.beginCam(e));
+    this.camZone.addEventListener('pointermove', (e) => this.moveCam(e));
+    this.camZone.addEventListener('pointerup', (e) => this.endCam(e));
+    this.camZone.addEventListener('pointercancel', () => this.endCam(null));
+  }
+
+  beginCam(e) {
+    e.preventDefault();
+    this.camPointer = e.pointerId;
+    this.camLastX = e.clientX;
+    this.camZone.setPointerCapture(e.pointerId);
+    this.onCam && this.onCam(0);
+  }
+
+  moveCam(e) {
+    if (this.camPointer !== e.pointerId) return;
+    const dx = e.clientX - this.camLastX;
+    this.camLastX = e.clientX;
+    const rate = Math.max(-1, Math.min(1, dx / 50));
+    if (dx !== 0) this.onCam && this.onCam(rate);
+  }
+
+  endCam(e) {
+    if (e && e.pointerId !== this.camPointer) return;
+    this.camPointer = null;
+    this.onCam && this.onCam(0);
   }
 
   beginJoy(e) {
