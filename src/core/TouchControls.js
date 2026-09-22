@@ -66,22 +66,25 @@ export class TouchControls {
     e.preventDefault();
     this.camPointer = e.pointerId;
     this.camLastX = e.clientX;
+    this.camLastY = e.clientY;
     this.camZone.setPointerCapture(e.pointerId);
-    this.onCam && this.onCam(0);
+    this.onCam && this.onCam(0, 0);
   }
 
   moveCam(e) {
     if (this.camPointer !== e.pointerId) return;
     const dx = e.clientX - this.camLastX;
+    const dy = e.clientY - this.camLastY;
     this.camLastX = e.clientX;
-    const rate = Math.max(-1, Math.min(1, dx / 50 * this.camSensitivity));
-    if (dx !== 0) this.onCam && this.onCam(rate);
+    this.camLastY = e.clientY;
+    const k = 0.005 * this.camSensitivity;
+    if (dx !== 0 || dy !== 0) this.onCam && this.onCam(dx * k, dy * k);
   }
 
   endCam(e) {
     if (e && e.pointerId !== this.camPointer) return;
     this.camPointer = null;
-    this.onCam && this.onCam(0);
+    this.onCam && this.onCam(0, 0);
   }
 
   beginJoy(e) {
@@ -104,8 +107,13 @@ export class TouchControls {
       dy = dy / len * this.joyRadius;
     }
     this.joyThumb.style.transform = `translate(${dx}px, ${dy}px)`;
-    this.vec.x = dx / this.joyRadius;
-    this.vec.y = -dy / this.joyRadius;
+    // dead zone + eased response so small nudges don't drift
+    const rawX = dx / this.joyRadius;
+    const rawY = -dy / this.joyRadius;
+    const dead = 0.14;
+    const ease = (v) => (Math.abs(v) < dead ? 0 : Math.sign(v) * Math.pow((Math.abs(v) - dead) / (1 - dead), 1.35));
+    this.vec.x = ease(rawX);
+    this.vec.y = ease(rawY);
     this.onMove && this.onMove(this.vec.x, this.vec.y);
   }
 

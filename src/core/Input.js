@@ -14,6 +14,8 @@ export class Input {
     this.pausePressed = false;
     this.camHeld = 0;
     this.camRate = 0;
+    this.camDX = 0;
+    this.camDY = 0;
 
     this.bind();
     if (this.touch) {
@@ -23,8 +25,11 @@ export class Input {
           this.moveZ = y;
         }
       };
-      this.touch.onCam = (rate) => {
-        if (this.usingTouch) this.camRate = rate;
+      this.touch.onCam = (dx, dy) => {
+        if (this.usingTouch) {
+          this.camDX += dx;
+          this.camDY += dy;
+        }
       };
       this.touch.onJump = (down) => {
         if (this.usingTouch) {
@@ -65,7 +70,7 @@ export class Input {
       if (k === 'q' || k === 'й') { if (this.camHeld === -1) this.camHeld = 0; }
       if (k === 'e' || k === 'л') { if (this.camHeld === 1) this.camHeld = 0; }
     });
-    window.addEventListener('blur', () => { this.keys.clear(); this.jumpHeld = false; this.camHeld = 0; this.camRate = 0; });
+    window.addEventListener('blur', () => { this.keys.clear(); this.jumpHeld = false; this.camHeld = 0; this.camRate = 0; this.camDX = 0; this.camDY = 0; });
   }
 
   axis2D() {
@@ -105,6 +110,14 @@ export class Input {
     this.deckPressed = false;
     this.pressed.clear();
     return out;
+  }
+
+  // per-frame screen-space camera delta from touch swipes
+  takeCamDelta() {
+    const d = { x: this.camDX, y: this.camDY };
+    this.camDX = 0;
+    this.camDY = 0;
+    return d;
   }
 
   held(key) { return this.keys.has(key.toLowerCase()); }

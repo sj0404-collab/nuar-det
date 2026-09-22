@@ -971,7 +971,13 @@ export class Game {
 
   updateCamera(dt) {
     const p = this.player;
-    const cam = this.input.camHeld !== 0 ? this.input.camHeld : this.input.camRate;
+    // touch swipe delta (radians per frame) overrides keyboard Q/E hold
+    const camD = this.input.takeCamDelta();
+    if (camD.x !== 0 || camD.y !== 0) {
+      this.cameraYaw += camD.x * 0.6;
+      this.cameraPitch = Math.max(-0.6, Math.min(0.9, this.cameraPitch + camD.y * 0.5));
+    }
+    const cam = this.input.camHeld !== 0 ? this.input.camHeld : 0;
     if (cam !== 0) this.cameraYaw += cam * 2.7 * dt;
     const dist = 9;
     const hy = 3.1;
