@@ -25,9 +25,14 @@ jobs:
         with:
           packages: ''
 
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.7.1'
+
       - name: Build release APK
         working-directory: android
-        run: ./gradlew assembleRelease
+        run: gradle assembleRelease --no-daemon
 
       - name: Upload APK to GitHub Release
         uses: softprops/action-gh-release@v2
