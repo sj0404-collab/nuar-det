@@ -102,6 +102,9 @@ export class AudioSys {
     if (!this.enabled || !this.ctx || this.muted) return;
     const t = this.ctx.currentTime;
     switch (name) {
+      case 'step':
+        this.noiseBurst(0.045, 320, 0.02);
+        break;
       case 'jump':
         this.tone(7, 0.22, t, 0.05, 1, 'square', 220);
         break;

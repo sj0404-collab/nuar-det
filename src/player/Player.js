@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { moveBox } from '../world/Collision.js';
-import { makePainterlyMaterial, addInkOutline } from '../render/Painterly.js';
+import { addInkOutline, flatGeometry } from '../render/Painterly.js';
+import { buildAnimeEyes, buildAnimeHair, buildAnimeMouth, makeToon } from '../render/AnimeFigure.js';
 
 const GRAVITY = -24;
 const MOVE_SPEED = 6.4;
@@ -13,9 +14,10 @@ const DASH_TIME = 0.26;
 const DASH_CD = 0.65;
 
 export class Player {
-  constructor(scene, effects) {
+  constructor(scene, effects, onSound) {
     this.scene = scene;
     this.effects = effects || null;
+    this.onSound = onSound || null;
     this.pos = new THREE.Vector3(0, 1, 20);
     this.vel = new THREE.Vector3(0, 0, 0);
     this.halfW = 0.42;
@@ -51,39 +53,39 @@ export class Player {
   buildMesh(scene) {
     const g = new THREE.Group();
 
-    const coatMat = makePainterlyMaterial(0x2b3542, { rimStrength: 0.65 });
-    const darkMat = makePainterlyMaterial(0x1c2129, { rimStrength: 0.4 });
-    const skinMat = makePainterlyMaterial(0xd8c9ae, { rimStrength: 0.3 });
-    const hatMat = makePainterlyMaterial(0x232931, { rimStrength: 0.5 });
+    const coatMat = makeToon(0x2b3542, { rimStrength: 0.65 });
+    const darkMat = makeToon(0x1c2129, { rimStrength: 0.4 });
+    const skinMat = makeToon(0xf0dcc0, { rimStrength: 0.3 });
+    const hatMat = makeToon(0x232931, { rimStrength: 0.5 });
 
     // --- legs ---
     this.legL = new THREE.Group();
-    const legGeo = new THREE.CylinderGeometry(0.09, 0.115, 0.36, 12);
+    const legGeo = flatGeometry(new THREE.CylinderGeometry(0.09, 0.115, 0.36, 5));
     const legLM = new THREE.Mesh(legGeo, darkMat);
     legLM.position.y = -0.16;
-    const shoeMat = makePainterlyMaterial(0x16191f);
-    const shoeL = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.09, 0.2), shoeMat);
+    const shoeMat = makeToon(0x16191f);
+    const shoeL = new THREE.Mesh(flatGeometry(new THREE.BoxGeometry(0.12, 0.09, 0.2)), shoeMat);
     shoeL.position.set(0, -0.37, 0.05);
     this.legL.add(legLM, shoeL);
     this.legR = new THREE.Group();
-    const legRM = new THREE.Mesh(legGeo.clone(), darkMat);
+    const legRM = new THREE.Mesh(flatGeometry(new THREE.CylinderGeometry(0.09, 0.115, 0.36, 5)), darkMat);
     legRM.position.y = -0.16;
-    const shoeR = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.09, 0.2), shoeMat);
+    const shoeR = new THREE.Mesh(flatGeometry(new THREE.BoxGeometry(0.12, 0.09, 0.2)), shoeMat);
     shoeR.position.set(0, -0.37, 0.05);
     this.legR.add(legRM, shoeR);
     this.legL.position.set(-0.16, -0.04, 0);
     this.legR.position.set(0.16, -0.04, 0);
     g.add(this.legL, this.legR);
 
-    // --- trench coat (tapered, more silhouette than box) ---
-    const coatGeo = new THREE.CylinderGeometry(0.2, 0.34, 0.92, 14, 1);
+    // --- trench coat (anime blazer shape, low-poly prism) ---
+    const coatGeo = flatGeometry(new THREE.CylinderGeometry(0.2, 0.34, 0.92, 6, 1));
     coatGeo.translate(0, 0.5, 0);
     this.coat = new THREE.Mesh(coatGeo, coatMat);
     this.coat.position.y = 0;
     g.add(this.coat);
 
     // collar
-    const collarGeo = new THREE.TorusGeometry(0.17, 0.06, 8, 14, Math.PI * 0.9);
+    const collarGeo = flatGeometry(new THREE.TorusGeometry(0.17, 0.06, 5, 9, Math.PI * 0.9));
     collarGeo.rotateX(Math.PI / 2);
     this.collar = new THREE.Mesh(collarGeo, coatMat);
     this.collar.position.set(0, 0.98, 0);
@@ -91,48 +93,48 @@ export class Player {
 
     // --- arms ---
     this.armL = new THREE.Group();
-    const armGeo = new THREE.CylinderGeometry(0.055, 0.07, 0.5, 10);
+    const armGeo = flatGeometry(new THREE.CylinderGeometry(0.055, 0.07, 0.5, 5));
     const armLM = new THREE.Mesh(armGeo, coatMat);
     armLM.position.y = -0.15;
     this.armL.add(armLM);
     this.armL.position.set(-0.32, 0.62, 0);
     this.armR = new THREE.Group();
-    const armRM = new THREE.Mesh(armGeo.clone(), coatMat);
+    const armRM = new THREE.Mesh(flatGeometry(new THREE.CylinderGeometry(0.055, 0.07, 0.5, 5)), coatMat);
     armRM.position.y = -0.15;
     this.armR.add(armRM);
     this.armR.position.set(0.32, 0.62, 0);
     g.add(this.armL, this.armR);
 
-    // --- head ---
-    const headGeo = new THREE.SphereGeometry(0.17, 16, 12);
-    const head = new THREE.Mesh(headGeo, skinMat);
-    head.scale.set(1, 1.15, 1);
-    head.position.y = 1.22;
-    // hair hint
-    const hairMat = makePainterlyMaterial(0x2a2118);
-    const hair = new THREE.Mesh(new THREE.SphereGeometry(0.175, 12, 10), hairMat);
-    hair.scale.set(1.02, 0.72, 1.02);
-    hair.position.y = 1.3;
-    g.add(head, hair);
-    // eye shadow (sideways face reads in 3/4)
-    const eyeMat = makePainterlyMaterial(0x0c0e12, { emission: 0x22262e, emissionBias: 0.4 });
-    const eyeL = new THREE.Mesh(new THREE.SphereGeometry(0.035, 8, 6), eyeMat);
-    eyeL.position.set(-0.1, 1.24, 0.14);
-    const eyeR = new THREE.Mesh(new THREE.SphereGeometry(0.035, 8, 6), eyeMat);
-    eyeR.position.set(0.1, 1.24, 0.14);
-    g.add(eyeL, eyeR);
+    // --- anime head: stylised face + big expressive eyes ---
+    const headG = new THREE.Group();
+    const headGeo = flatGeometry(new THREE.SphereGeometry(0.17, 7, 5));
+    const skull = new THREE.Mesh(headGeo, skinMat);
+    skull.scale.set(0.95, 1.1, 0.98);
+    skull.position.y = 1.22;
+    headG.add(skull);
+    // anime hair (spiky, dark)
+    buildAnimeHair(headG, {
+      cx: 0, cy: 1.34, cz: -0.02, radius: 0.16, color: 0x2a2118, style: 'spiky',
+    });
+    // big anime eyes with glints
+    buildAnimeEyes(headG, {
+      cx: 0, cy: 1.23, cz: 0.13, dist: 0.108, radius: 0.05, iris: 0x2a5f7f, width: 0.032,
+    });
+    buildAnimeMouth(headG, { cx: 0, cy: 1.06, cz: 0.15, width: 0.05 });
+    g.add(headG);
+    this.head = headG;
+    const headMesh = skull;
 
     // --- fedora ---
-    const brimGeo = new THREE.CylinderGeometry(0.3, 0.3, 0.035, 18);
-    const brim = new THREE.Mesh(brimGeo, hatMat);
+    const brim = new THREE.Mesh(flatGeometry(new THREE.CylinderGeometry(0.3, 0.3, 0.035, 8)), hatMat);
     brim.position.y = 1.45;
-    const crownGeo = new THREE.CylinderGeometry(0.16, 0.2, 0.2, 16);
+    const crownGeo = flatGeometry(new THREE.CylinderGeometry(0.16, 0.2, 0.2, 7));
     crownGeo.translate(0, 0.1, 0);
     const crown = new THREE.Mesh(crownGeo, hatMat);
     crown.position.y = 1.45;
     // band
-    const bandMat = makePainterlyMaterial(0x7a3b2e, { emission: 0x7a3b2e, emissionBias: 0.25 });
-    const band = new THREE.Mesh(new THREE.CylinderGeometry(0.175, 0.185, 0.05, 16), bandMat);
+    const bandMat = makeToon(0x7a3b2e, { emission: 0x7a3b2e, emissionBias: 0.25 });
+    const band = new THREE.Mesh(flatGeometry(new THREE.CylinderGeometry(0.175, 0.185, 0.05, 8)), bandMat);
     band.position.y = 1.51;
     this.hat = new THREE.Group();
     this.hat.add(brim, crown, band);
@@ -140,12 +142,12 @@ export class Player {
     g.add(this.hat);
 
     // --- scarf (trailing ribbon, lags the turn) ---
-    const scarfMat = makePainterlyMaterial(0xc98f3f, { rimStrength: 0.3 });
+    const scarfMat = makeToon(0xc98f3f, { rimStrength: 0.3 });
     this.scarf = new THREE.Group();
-    const knot = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.07, 0.14), scarfMat);
+    const knot = new THREE.Mesh(flatGeometry(new THREE.BoxGeometry(0.26, 0.07, 0.14)), scarfMat);
     knot.position.set(0, 0.14, -0.05);
-    const tailMat = makePainterlyMaterial(0xc98f3f, { emission: 0x8a5f2e, emissionBias: 0.12, rimStrength: 0.3 });
-    const tailGeo = new THREE.CylinderGeometry(0.018, 0.07, 0.5, 8);
+    const tailMat = makeToon(0xc98f3f, { emission: 0x8a5f2e, emissionBias: 0.12, rimStrength: 0.3 });
+    const tailGeo = flatGeometry(new THREE.CylinderGeometry(0.018, 0.07, 0.5, 5));
     tailGeo.rotateX(Math.PI / 2);
     this.scarfTail = new THREE.Mesh(tailGeo, tailMat);
     this.scarfTail.position.set(0, 0.06, -0.36);
@@ -156,7 +158,7 @@ export class Player {
 
     // ink outlines on key pieces
     addInkOutline(this.coat, { thickness: 0.014 });
-    addInkOutline(head, { thickness: 0.013 });
+    addInkOutline(headMesh, { thickness: 0.013 });
     addInkOutline(brim, { thickness: 0.012 });
     addInkOutline(crown, { thickness: 0.012 });
     for (const m of [legLM, legRM]) addInkOutline(m, { thickness: 0.012, opacity: 0.8 });
@@ -165,7 +167,6 @@ export class Player {
     g.rotation.y = Math.PI;
     scene.add(g);
     this.mesh = g;
-    this.head = head;
     this.legs = [this.legL, this.legR];
   }
 
@@ -216,6 +217,7 @@ export class Player {
       if (len > 0.3) this.dashDir.set(mx, 0, mz).normalize();
       this.vel.y = 0;
       if (this.effects) this.effects.dash(this.mesh.position.clone(), this.dashDir.clone());
+      if (this.onSound) this.onSound('dash');
     }
 
     let tx = 0, tz = 0;
@@ -256,6 +258,7 @@ export class Player {
       this.buffer = 0;
       jumping = true;
       if (this.effects) this.effects.jump(this.mesh.position.clone());
+      if (this.onSound) this.onSound('jump');
     } else if (input.jump && this.abilities.jump && this.jumps < 1) {
       ty = DOUBLE_JUMP_VEL;
       this.jumps += 1;
@@ -263,6 +266,7 @@ export class Player {
       jumping = true;
       this.dashSpark = 0.3;
       if (this.effects) this.effects.jump(this.mesh.position.clone());
+      if (this.onSound) this.onSound('doublejump');
     }
 
     const prevY = this.pos.y;
@@ -293,12 +297,26 @@ export class Player {
     this.groundY = this.grounded ? this.pos.y : this.groundY;
 
     if (wasGrounded && !this.grounded) this.coyote = 0.1;
-    if (res.grounded) { this.jumps = 0; this.coyote = 0.12; if (landed && this.effects) { this.landT = 0.6; this.effects.land(this.mesh.position.clone()); } }
+    if (res.grounded) {
+      this.jumps = 0;
+      this.coyote = 0.12;
+      if (landed && this.effects) { this.landT = 0.6; this.effects.land(this.mesh.position.clone()); }
+      if (landed && this.onSound) this.onSound('jump');
+    }
 
     // walk cycle
     const speed = Math.hypot(tx, tz);
-    if (this.grounded && speed > 0.6) this.walkT += dt * (4 + speed * 1.1);
-    else this.walkT = 0;
+    if (this.grounded && speed > 0.6) {
+      this.walkT += dt * (4 + speed * 1.1);
+      this.stepAcc = (this.stepAcc || 0) + dt * speed;
+      if (this.stepAcc > 1.35 && this.onSound) {
+        this.stepAcc = 0;
+        this.onSound('step');
+      }
+    } else {
+      this.walkT = 0;
+      this.stepAcc = 0;
+    }
 
     this.mesh.position.set(this.pos.x, this.pos.y + 0.06, this.pos.z);
     this.animate(dt, speed, ty);

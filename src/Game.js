@@ -13,7 +13,8 @@ import { Combat } from './cards/Combat.js';
 import { CARDS, STARTER_DECK, ENCOUNTERS, ENEMIES } from './cards/data.js';
 import { FINAL, ENDINGS } from './story/data.js';
 import { AudioSys } from './audio/AudioSys.js';
-import { makePainterlyMaterial, addInkOutline } from './render/Painterly.js';
+import { makePainterlyMaterial, addInkOutline, flatGeometry } from './render/Painterly.js';
+import { buildAnimeEyes, buildAnimeHair, buildAnimeMouth, makeToon } from './render/AnimeFigure.js';
 import { Effects } from './render/Particles.js';
 import { GlowSprites } from './render/GlowSprites.js';
 
@@ -45,7 +46,7 @@ export class Game {
     this.glow = new GlowSprites(this.scene);
     this.glow.build(this.world);
 
-    this.player = new Player(this.scene, this.effects);
+    this.player = new Player(this.scene, this.effects, (s) => this.audio.sfx(s));
     const coll = this.world.getColliders();
     this.player.setColliders(coll.solids, coll.oneWays);
 
@@ -292,24 +293,8 @@ export class Game {
 
   buildNpcs() {
     for (const n of this.world.npcs) {
-      // small 3D figure so characters read in the world
-      const figure = new THREE.Group();
-      const coatMat = makePainterlyMaterial(0x3a3336, { rimStrength: 0.55 });
-      const skinMat = makePainterlyMaterial(0xd8c9ae, { rimStrength: 0.3 });
-      const hatMat = makePainterlyMaterial(0x262b33, { rimStrength: 0.4 });
-      const body = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.28, 0.9, 14), coatMat);
-      body.position.y = 0.45;
-      addInkOutline(body, { thickness: 0.016, opacity: 0.75 });
-      const head = new THREE.Mesh(new THREE.SphereGeometry(0.14, 14, 10), skinMat);
-      head.position.y = 1.05;
-      addInkOutline(head, { thickness: 0.015, opacity: 0.7 });
-      const brim = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.24, 0.04, 16), hatMat);
-      brim.position.y = 1.24;
-      const crown = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.15, 0.14, 14), hatMat);
-      crown.position.y = 1.31;
-      figure.add(body, head, brim, crown);
-      // slouched idle
-      figure.rotation.x = 0.08;
+      // faceted low-poly 3D figure so characters read in the world
+      const figure = this.buildLowPolyFigure(n);
       figure.position.set(n.pos.x, n.pos.y + 0.1, n.pos.z);
       figure.rotation.y = Math.atan2(-this.checkpoint.x + n.pos.x, -this.checkpoint.z + n.pos.z) || 0;
       this.scene.add(figure);
@@ -334,6 +319,233 @@ export class Game {
       this.scene.add(light);
       n.light = light;
     }
+  }
+
+  buildLowPolyFigure(n) {
+    const g = new THREE.Group();
+
+    const base = this.npcBaseColor(n);
+    const coatMat = makeToon(base, { rimStrength: 0.55 });
+    const skinMat = makeToon(0xf0dcc0, { rimStrength: 0.3 });
+    const bootMat = makeToon(0x16191f);
+
+    // --- legs (trousers) ---
+    const legGeo = flatGeometry(new THREE.CylinderGeometry(0.075, 0.09, 0.34, 4));
+    const legL = new THREE.Mesh(legGeo, bootMat);
+    legL.position.set(-0.12, 0.14, 0);
+    const legR = legL.clone();
+    legR.position.x = 0.12;
+    g.add(legL, legR);
+
+    // --- coat (anime blazer) ---
+    const coatGeo = flatGeometry(new THREE.CylinderGeometry(0.2, 0.3, 0.82, 6, 1));
+    coatGeo.translate(0, 0.4, 0);
+    const body = new THREE.Mesh(coatGeo, coatMat);
+    addInkOutline(body, { thickness: 0.016, opacity: 0.75 });
+    g.add(body);
+
+    // belt
+    const beltMat = makeToon(0x1c2129, { rimStrength: 0.4 });
+    const belt = new THREE.Mesh(flatGeometry(new THREE.CylinderGeometry(0.205, 0.22, 0.05, 6)), beltMat);
+    belt.position.y = 0.46;
+    g.add(belt);
+    // collar ring (open jacket lapels)
+    const collarGeo = flatGeometry(new THREE.TorusGeometry(0.17, 0.05, 4, 7, Math.PI * 0.85));
+    collarGeo.rotateX(Math.PI / 2);
+    const collar = new THREE.Mesh(collarGeo, coatMat);
+    collar.position.set(0, 0.78, 0);
+    g.add(collar);
+    // white shirt chest hint
+    const shirtMat = makeToon(0xefe6d0, { rimStrength: 0.3 });
+    const shirt = new THREE.Mesh(flatGeometry(new THREE.BoxGeometry(0.14, 0.14, 0.02)), shirtMat);
+    shirt.position.set(0, 0.72, 0.21);
+    g.add(shirt);
+
+    // --- arms (animated idle swing) ---
+    const armGeo = flatGeometry(new THREE.CylinderGeometry(0.05, 0.062, 0.42, 4));
+    const armL = new THREE.Group();
+    const armLM = new THREE.Mesh(armGeo, coatMat);
+    armLM.position.y = -0.13;
+    const handMat = skinMat;
+    const handL = new THREE.Mesh(flatGeometry(new THREE.SphereGeometry(0.045, 5, 4)), handMat);
+    handL.position.y = -0.36;
+    armL.add(armLM, handL);
+    armL.position.set(-0.26, 0.58, 0);
+    const armR = new THREE.Group();
+    const armRM = new THREE.Mesh(armGeo.clone(), coatMat);
+    armRM.position.y = -0.13;
+    const handR = new THREE.Mesh(flatGeometry(new THREE.SphereGeometry(0.045, 5, 4)), handMat);
+    handR.position.y = -0.36;
+    armR.add(armRM, handR);
+    armR.position.set(0.26, 0.58, 0);
+    g.add(armL, armR);
+
+    // --- anime head: live face, big eyes, unique hair ---
+    const headG = new THREE.Group();
+    const headGeo = flatGeometry(new THREE.SphereGeometry(0.15, 7, 5));
+    const skull = new THREE.Mesh(headGeo, skinMat);
+    skull.scale.set(0.95, 1.1, 0.98);
+    skull.position.y = 0.96;
+    headG.add(skull);
+    const hairStyle = this.npcHairStyle(n);
+    buildAnimeHair(headG, {
+      cx: 0, cy: 1.06, cz: -0.02, radius: 0.145,
+      color: this.npcHairColor(n), style: hairStyle,
+    });
+    buildAnimeEyes(headG, {
+      cx: 0, cy: 0.97, cz: 0.12, dist: 0.095, radius: 0.045,
+      iris: this.npcEyeColor(n), width: 0.028,
+    });
+    buildAnimeMouth(headG, { cx: 0, cy: 0.84, cz: 0.13, width: 0.045, color: 0x9c4a48 });
+    // eyebrows (per expression)
+    const browMat = makeToon(this.npcHairColor(n), { toon: true });
+    for (const s of [-1, 1]) {
+      const brow = new THREE.Mesh(flatGeometry(new THREE.BoxGeometry(0.06, 0.013, 0.013)), browMat);
+      brow.position.set(s * 0.07, 1.02, 0.14);
+      brow.rotation.z = s * -0.12;
+      headG.add(brow);
+    }
+    g.add(headG);
+    n.armL = armL;
+    n.armR = armR;
+    n.headG = headG;
+
+    // --- headgear / accessories (style depends on the owner) ---
+    const hatMat = makeToon(this.npcHatColor(n), { rimStrength: 0.4 });
+    const hatType = n.id === 'rook' || n.id === 'bellsong' ? 'cap'
+      : n.id === 'madame' ? 'hat'
+      : n.id === 'echowisp' || n.id === 'shade' ? 'hood'
+      : n.id === 'harbormaster' ? 'beret'
+      : n.id === 'tinker' ? 'goggles'
+      : 'cap';
+    const hat = this.npcHat(hatType, hatMat);
+    hat.position.y = 1.08;
+    g.add(hat);
+
+    // props per character
+    if (n.id === 'lamplighter') {
+      const lantern = new THREE.Mesh(
+        flatGeometry(new THREE.BoxGeometry(0.1, 0.26, 0.08)),
+        makeToon(0xd4a559, { emission: 0xffcf8a, emissionBias: 1.1 })
+      );
+      lantern.position.set(0.34, 0.32, 0);
+      g.add(lantern);
+    } else if (n.id === 'rook') {
+      const badge = new THREE.Mesh(
+        flatGeometry(new THREE.CylinderGeometry(0.05, 0.05, 0.02, 5)),
+        makeToon(0xd4a559, { emission: 0xd4a559, emissionBias: 0.7 })
+      );
+      badge.rotation.x = Math.PI / 2;
+      badge.position.set(0.16, 0.55, 0.2);
+      g.add(badge);
+    } else if (n.id === 'harbormaster') {
+      const wheel = new THREE.Mesh(
+        flatGeometry(new THREE.TorusGeometry(0.12, 0.02, 4, 8)),
+        makeToon(0x8f6a2e, { rimStrength: 0.5 })
+      );
+      wheel.rotation.y = Math.PI / 2;
+      wheel.position.set(0.34, 0.48, -0.06);
+      g.add(wheel);
+    } else if (n.id === 'shade' || n.id === 'echowisp') {
+      // ghost NPCs: faint inner glow
+      const ghostGlow = new THREE.Mesh(
+        new THREE.IcosahedronGeometry(0.5, 0),
+        new THREE.MeshBasicMaterial({
+          color: 0x7c8ea3, transparent: true, opacity: 0.35,
+          side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending,
+        })
+      );
+      ghostGlow.position.y = 0.55;
+      g.add(ghostGlow);
+    }
+
+    g.rotation.x = 0.08;
+    return g;
+  }
+
+  npcHat(type, hatMat) {
+    const hat = new THREE.Group();
+    const g0 = new THREE.Group();
+    if (type === 'goggles') {
+      const band = new THREE.Mesh(flatGeometry(new THREE.BoxGeometry(0.3, 0.06, 0.04)), hatMat);
+      band.position.y = 0.05;
+      g0.add(band);
+      const glassGeo = flatGeometry(new THREE.CylinderGeometry(0.08, 0.08, 0.04, 8));
+      glassGeo.rotateZ(Math.PI / 2);
+      for (const s of [-1, 1]) {
+        const glass = new THREE.Mesh(glassGeo, makeToon(0x9fe0d8, { emission: 0x4a8f9a, emissionBias: 0.7 }));
+        glass.position.set(s * 0.1, 0.05, 0.02);
+        g0.add(glass);
+      }
+      return hat;
+    }
+    if (type === 'cap') {
+      const top = new THREE.Mesh(flatGeometry(new THREE.CylinderGeometry(0.18, 0.2, 0.05, 7)), hatMat);
+      top.position.y = 0.02;
+      const dome = new THREE.Mesh(flatGeometry(new THREE.SphereGeometry(0.16, 6, 4)), hatMat);
+      dome.scale.y = 0.6;
+      dome.position.y = 0.08;
+      g0.add(top, dome);
+    } else if (type === 'hat') {
+      const brim = new THREE.Mesh(flatGeometry(new THREE.CylinderGeometry(0.27, 0.27, 0.03, 8)), hatMat);
+      const crown = new THREE.Mesh(flatGeometry(new THREE.CylinderGeometry(0.13, 0.16, 0.22, 7)), hatMat);
+      crown.position.y = 0.12;
+      const band = new THREE.Mesh(flatGeometry(new THREE.TorusGeometry(0.145, 0.018, 4, 7)), hatMat);
+      band.rotation.x = Math.PI / 2;
+      band.position.y = 0.11;
+      g0.add(brim, crown, band);
+    } else if (type === 'hood') {
+      const hood = new THREE.Mesh(flatGeometry(new THREE.ConeGeometry(0.24, 0.34, 6, 1)), hatMat);
+      hood.position.y = 0.08;
+      g0.add(hood);
+    } else if (type === 'beret') {
+      const beret = new THREE.Mesh(flatGeometry(new THREE.SphereGeometry(0.19, 6, 4)), hatMat);
+      beret.scale.y = 0.45;
+      beret.position.y = 0.07;
+      g0.add(beret);
+    }
+    hat.add(g0);
+    return hat;
+  }
+
+  npcBaseColor(n) {
+    const map = {
+      rook: 0x3a4a5a, tinker: 0x4a3f35, madame: 0x3a2b33, echowisp: 0x2c3a44,
+      lamplighter: 0x3a3f4a, harbormaster: 0x2c4244, bellsong: 0x39423a, shade: 0x2a3038,
+    };
+    return map[n.id] || 0x3a3336;
+  }
+
+  npcHatColor(n) {
+    const map = {
+      rook: 0x262b33, tinker: 0x2b2416, madame: 0x241a26, echowisp: 0x20303c,
+      lamplighter: 0x222c38, harbormaster: 0x1f2e30, bellsong: 0x272e28, shade: 0x202426,
+    };
+    return map[n.id] || 0x262b33;
+  }
+
+  npcHairStyle(n) {
+    const map = {
+      rook: 'short', tinker: 'spiky', madame: 'bob', echowisp: 'hood',
+      lamplighter: 'short', harbormaster: 'bob', bellsong: 'short', shade: 'hood',
+    };
+    return map[n.id] || 'short';
+  }
+
+  npcHairColor(n) {
+    const map = {
+      rook: 0x2a2f38, tinker: 0x6b4a32, madame: 0x2a1a2c, echowisp: 0x3a524f,
+      lamplighter: 0x7a4a2c, harbormaster: 0x203c42, bellsong: 0x33403a, shade: 0x2a3238,
+    };
+    return map[n.id] || 0x2a2118;
+  }
+
+  npcEyeColor(n) {
+    const map = {
+      rook: 0x2a5f7f, tinker: 0x8f5a2e, madame: 0x8f4a7f, echowisp: 0x7ee0c8,
+      lamplighter: 0xffb45a, harbormaster: 0x4a9a9a, bellsong: 0x5f7f2a, shade: 0x9fb2c4,
+    };
+    return map[n.id] || 0x2a5f7f;
   }
 
   buildEnemies() {
@@ -928,6 +1140,16 @@ export class Game {
     for (const n of this.world.npcs) {
       n.figure.position.y = n.pos.y + 0.1 + Math.sin(t * 1.1 + n.bobPhase) * 0.04;
       n.figure.rotation.y += Math.sin(t * 0.4 + n.bobPhase) * 0.002;
+      // anime idle: arms sway, head drifts, slight breathing lean
+      const breathe = Math.sin(t * 1.4 + n.bobPhase) * 0.02;
+      if (n.armL) n.armL.rotation.z = 0.08 + Math.sin(t * 1.2 + n.bobPhase) * 0.06;
+      if (n.armR) n.armR.rotation.z = -0.08 - Math.sin(t * 1.2 + n.bobPhase) * 0.06;
+      if (n.armL) n.armL.rotation.x = Math.sin(t * 0.9 + n.bobPhase) * 0.05;
+      if (n.armR) n.armR.rotation.x = -Math.sin(t * 0.9 + n.bobPhase) * 0.05;
+      if (n.headG) n.headG.rotation.z = Math.sin(t * 0.7 + n.bobPhase) * 0.03;
+      if (n.headG) n.headG.rotation.y = Math.sin(t * 0.5 + n.bobPhase) * 0.08;
+      n.figure.rotation.x = 0.08 + breathe;
+      n.figure.rotation.z = Math.sin(t * 1.1 + n.bobPhase) * 0.015;
     }
   }
 

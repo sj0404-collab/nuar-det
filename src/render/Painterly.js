@@ -16,6 +16,8 @@ function buildPainterlyShader() {
       uSpecular: { value: new THREE.Color(0xfff2d8) },
       uTint: { value: new THREE.Color(0xffffff) },
       uGrain: { value: 0.035 },
+      uToon: { value: 0.0 },
+      uToonShadow: { value: 0.06 },
     },
     vertexShader: `
       varying vec3 vNormal;
@@ -44,6 +46,8 @@ function buildPainterlyShader() {
       uniform vec3 uSpecular;
       uniform vec3 uTint;
       uniform float uGrain;
+      uniform float uToon;
+      uniform float uToonShadow;
       uniform vec3 fogColor;
       uniform float fogNear;
       uniform float fogFar;
@@ -53,6 +57,13 @@ function buildPainterlyShader() {
 
       float stepify(float v, float a, float b) {
         return smoothstep(a, b, v);
+      }
+
+      // anime cel-shading: hard light/dark split with a warm mid band
+      float celStep(float d, float shadowStart, float shadowEnd, float midStart, float midEnd) {
+        float light = stepify(d, midEnd, midStart + 0.42);
+        float mid = stepify(d, shadowStart, shadowEnd) - stepify(d, midEnd, midStart + 0.42);
+        return light + mid * 0.66;
       }
 
       // cheap stylised noise, stable per fragment
@@ -70,10 +81,17 @@ function buildPainterlyShader() {
 
         // three distinct abraded-paint bands + a soft mid-tone fill
         float band = 0.0;
-        band += stepify(d, 0.14, 0.30) * 0.32;
-        band += stepify(d, 0.33, 0.54) * 0.34;
-        band += stepify(d, 0.57, 0.80) * 0.30;
-        float s = 0.10 + band;
+        float s;
+        if (uToon > 0.5) {
+          // anime-style cel shading: hard shadow line, crisp mid, bright top
+          band += stepify(d, 0.14, 0.22) * 0.32;
+          s = uToonShadow + band + stepify(d, 0.34, 0.5) * 0.58;
+        } else {
+          band += stepify(d, 0.14, 0.30) * 0.32;
+          band += stepify(d, 0.33, 0.54) * 0.34;
+          band += stepify(d, 0.57, 0.80) * 0.30;
+          s = 0.10 + band;
+        }
 
         vec3 base = uColor * uTint;
         vec3 col = base * (uLightColor * s + uAmbient);
@@ -129,10 +147,20 @@ export function makePainterlyMaterial(color, opts = {}) {
   if (opts.rimPower !== undefined) mat.uniforms.uRimPower.value = opts.rimPower;
   if (opts.fill) mat.uniforms.uFill.value.set(opts.fill);
   if (opts.tint) mat.uniforms.uTint.value.set(opts.tint);
+  if (opts.toon) mat.uniforms.uToon.value = 1.0;
+  if (opts.toonShadow !== undefined) mat.uniforms.uToonShadow.value = opts.toonShadow;
   mat.uniforms.fogColor = { value: new THREE.Color(0x0f1a2c) };
   mat.uniforms.fogNear = { value: 24 };
   mat.uniforms.fogFar = { value: 240 };
   return mat;
+}
+
+// Convert a smooth (indexed) geometry to a faceted one: duplicate face
+// vertices and bake per-face normals so every triangle reads as a polygon.
+export function flatGeometry(geo) {
+  const flat = geo.toNonIndexed();
+  flat.computeVertexNormals();
+  return flat;
 }
 
 // Painterly "ink" outline: an inverted-hull shell that hugs the mesh. Use on
