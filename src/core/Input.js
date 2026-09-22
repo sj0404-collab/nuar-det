@@ -13,9 +13,8 @@ export class Input {
     this.mapPressed = false;
     this.pausePressed = false;
     this.camKeyHeld = 0; // keyboard Q/E (-1/0/+1)
-    this.camRate = 0;
-    this.camDX = 0;
-    this.camDY = 0;
+    this.camJoyX = 0;
+    this.camJoyY = 0;
 
     this.bind();
     if (this.touch) {
@@ -25,10 +24,10 @@ export class Input {
           this.moveZ = y;
         }
       };
-      this.touch.onCam = (dx, dy) => {
+      this.touch.onCamJoy = (x, y) => {
         if (this.usingTouch) {
-          this.camDX += dx;
-          this.camDY += dy;
+          this.camJoyX = x;
+          this.camJoyY = y;
         }
       };
       this.touch.onJump = (down) => {
@@ -47,10 +46,9 @@ export class Input {
     return this.touch && this.touch.isTouch;
   }
 
-  // combined camera rotate direction: keyboard Q/E or touch buttons
+  // combined camera rotate direction: keyboard Q/E
   get camHeld() {
-    if (this.camKeyHeld !== 0) return this.camKeyHeld;
-    return (this.usingTouch && this.touch.camHold) || 0;
+    return this.camKeyHeld;
   }
 
   bind() {
@@ -76,7 +74,7 @@ export class Input {
       if (k === 'q' || k === 'й') { if (this.camKeyHeld === -1) this.camKeyHeld = 0; }
       if (k === 'e' || k === 'л') { if (this.camKeyHeld === 1) this.camKeyHeld = 0; }
     });
-    window.addEventListener('blur', () => { this.keys.clear(); this.jumpHeld = false; this.camKeyHeld = 0; this.camRate = 0; this.camDX = 0; this.camDY = 0; });
+    window.addEventListener('blur', () => { this.keys.clear(); this.jumpHeld = false; this.camKeyHeld = 0; this.camJoyX = 0; this.camJoyY = 0; });
   }
 
   axis2D() {
@@ -116,14 +114,6 @@ export class Input {
     this.deckPressed = false;
     this.pressed.clear();
     return out;
-  }
-
-  // per-frame screen-space camera delta from touch swipes
-  takeCamDelta() {
-    const d = { x: this.camDX, y: this.camDY };
-    this.camDX = 0;
-    this.camDY = 0;
-    return d;
   }
 
   held(key) { return this.keys.has(key.toLowerCase()); }

@@ -978,14 +978,18 @@ export class Game {
 
   updateCamera(dt) {
     const p = this.player;
-    // touch swipe delta (radians per frame) overrides keyboard Q/E hold
-    const camD = this.input.takeCamDelta();
-    if (camD.x !== 0 || camD.y !== 0) {
-      this.cameraYaw += camD.x * 0.6;
-      this.cameraPitch = Math.max(-0.6, Math.min(0.9, this.cameraPitch + camD.y * 0.5));
+    // camera yaw/pitch from right joystick (touch) or Q/E (keyboard)
+    const joyX = this.input.camJoyX;
+    const joyY = this.input.camJoyY;
+    const keyCam = this.input.camHeld; // keyboard Q/E (-1/0/+1)
+
+    const yawRate = keyCam * 2.7 + joyX * 2.7;
+    if (yawRate !== 0) this.cameraYaw += yawRate * dt;
+
+    if (joyY !== 0) {
+      this.cameraPitch = Math.max(-0.6, Math.min(0.9, this.cameraPitch + joyY * 1.4 * dt));
     }
-    const cam = this.input.camHeld !== 0 ? this.input.camHeld : 0;
-    if (cam !== 0) this.cameraYaw += cam * 2.7 * dt;
+
     // portrait: wider vertical view, pull camera back a little so streets read well
     const aspect = this.camera.aspect;
     const portrait = aspect < 1;

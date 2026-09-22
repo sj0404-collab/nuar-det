@@ -1,31 +1,35 @@
 export class TouchControls {
-  constructor(canvas, onMove, onJump, onDash, onCam = () => {}) {
+  constructor(canvas, onMove, onJump, onDash, onCamJoy = () => {}) {
     this.el = document.getElementById('touch-controls');
     this.joyZone = document.getElementById('joy-zone');
     this.joyBase = document.getElementById('joy-base');
     this.joyThumb = document.getElementById('joy-thumb');
-    this.camZone = document.getElementById('cam-zone');
+    this.camJoyZone = document.getElementById('cam-joy-zone');
+    this.camJoyBase = document.getElementById('cam-joy-base');
+    this.camJoyThumb = document.getElementById('cam-joy-thumb');
     this.btnJump = document.getElementById('btn-jump');
     this.btnDash = document.getElementById('btn-dash');
     this.btnInteract = document.getElementById('btn-interact');
-    this.btnCamL = document.getElementById('btn-cam-l');
-    this.btnCamR = document.getElementById('btn-cam-r');
 
     this.onMove = onMove;
     this.onJump = onJump;
     this.onDash = onDash;
-    this.onCam = onCam;
+    this.onCamJoy = onCamJoy;
 
     // camera sensitivity (persisted)
     this.camSensitivity = parseFloat(localStorage.getItem('nuar_cam_sens')) || 1.0;
     // joystick Y: default off (forward = up); user can invert from settings
     this.invertJoy = localStorage.getItem('nuar_invert_joy') === '1';
-    this.camHold = 0;
 
     this.joyPointer = null;
     this.joyCenter = { x: 0, y: 0 };
     this.joyRadius = 52;
     this.vec = { x: 0, y: 0 };
+
+    this.camJoyPointer = null;
+    this.camJoyCenter = { x: 0, y: 0 };
+    this.camJoyRadius = 52;
+    this.camVec = { x: 0, y: 0 };
 
     this.active = false;
     this.bindEvents();
@@ -59,56 +63,53 @@ export class TouchControls {
 
     this.btnInteract.addEventListener('pointerdown', (e) => { e.preventDefault(); this.onInteract && this.onInteract(); });
 
-    // camera rotate buttons (touch equivalent of Q/E)
-    const holdCamBtn = (btn, dir) => {
-      const downFn = (e) => { e.preventDefault(); e.stopPropagation(); this.camHold = dir; };
-      const upFn = (e) => { e.preventDefault(); e.stopPropagation(); if (this.camHold === dir) this.camHold = 0; };
-      btn.addEventListener('pointerdown', downFn);
-      btn.addEventListener('pointerup', upFn);
-      btn.addEventListener('pointercancel', upFn);
-      btn.addEventListener('pointerleave', upFn);
-    };
-    if (this.btnCamL && this.btnCamR) {
-      holdCamBtn(this.btnCamL, -1);
-      holdCamBtn(this.btnCamR, 1);
-    }
-
     this.joyZone.addEventListener('pointerdown', (e) => this.beginJoy(e));
     this.joyZone.addEventListener('pointermove', (e) => this.moveJoy(e));
     this.joyZone.addEventListener('pointerup', (e) => this.endJoy(e));
     this.joyZone.addEventListener('pointercancel', () => this.endJoy(null));
 
-    this.camPointer = null;
-    this.camLastX = 0;
-    this.camZone.addEventListener('pointerdown', (e) => this.beginCam(e));
-    this.camZone.addEventListener('pointermove', (e) => this.moveCam(e));
-    this.camZone.addEventListener('pointerup', (e) => this.endCam(e));
-    this.camZone.addEventListener('pointercancel', () => this.endCam(null));
+    // camera is a second joystick on the right side, the mirror of the move stick
+    this.camJoyZone.addEventListener('pointerdown', (e) => this.beginCamJoy(e));
+    this.camJoyZone.addEventListener('pointermove', (e) => this.moveCamJoy(e));
+    this.camJoyZone.addEventListener('pointerup', (e) => this.endCamJoy(e));
+    this.camJoyZone.addEventListener('pointercancel', () => this.endCamJoy(null));
   }
 
-  beginCam(e) {
+  beginCamJoy(e) {
     e.preventDefault();
-    this.camPointer = e.pointerId;
-    this.camLastX = e.clientX;
-    this.camLastY = e.clientY;
-    this.camZone.setPointerCapture(e.pointerId);
-    this.onCam && this.onCam(0, 0);
+    this.camJoyPointer = e.pointerId;
+    const r = this.camJoyBase.getBoundingClientRect();
+    this.camJoyCenter = { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+    this.camJoyZone.setPointerCapture(e.pointerId);
+    this.camVec.x = 0; this.camVec.y = 0;
+    this.onCamJoy && this.onCamJoy(0, 0);
   }
 
-  moveCam(e) {
-    if (this.camPointer !== e.pointerId) return;
-    const dx = e.clientX - this.camLastX;
-    const dy = e.clientY - this.camLastY;
-    this.camLastX = e.clientX;
-    this.camLastY = e.clientY;
-    const k = 0.005 * this.camSensitivity;
-    if (dx !== 0 || dy !== 0) this.onCam && this.onCam(dx * k, dy * k);
+  moveCamJoy(e) {
+    if (this.camJoyPointer !== e.pointerId) return;
+    let dx = e.clientX - this.camJoyCenter.x;
+    let dy = e.clientY - this.camJoyCenter.y;
+    const len = Math.hypot(dx, dy);
+    if (len > this.camJoyRadius) {
+      dx = dx / len * this.camJoyRadius;
+      dy = dy / len * this.camJoyRadius;
+    }
+    this.camJoyThumb.style.transform = `translate(${dx}px, ${dy}px)`;
+    const rawX = dx / this.camJoyRadius;
+    const rawY = dy / this.camJoyRadius;
+    const dead = 0.14;
+    const ease = (v) => (Math.abs(v) < dead ? 0 : Math.sign(v) * Math.pow((Math.abs(v) - dead) / (1 - dead), 1.35));
+    this.camVec.x = ease(rawX);
+    this.camVec.y = ease(rawY);
+    this.onCamJoy && this.onCamJoy(this.camVec.x, this.camVec.y);
   }
 
-  endCam(e) {
-    if (e && e.pointerId !== this.camPointer) return;
-    this.camPointer = null;
-    this.onCam && this.onCam(0, 0);
+  endCamJoy(e) {
+    if (e && e.pointerId !== this.camJoyPointer) return;
+    this.camJoyPointer = null;
+    this.camJoyThumb.style.transform = 'translate(0px,0px)';
+    this.camVec.x = 0; this.camVec.y = 0;
+    this.onCamJoy && this.onCamJoy(0, 0);
   }
 
   beginJoy(e) {

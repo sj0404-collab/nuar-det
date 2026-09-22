@@ -193,8 +193,9 @@ export class Player {
     const axis = input.axis2D();
     const sin = Math.sin(cameraYaw);
     const cos = Math.cos(cameraYaw);
-    let mx = axis.x * cos - axis.z * sin;
-    let mz = -(axis.x * sin + axis.z * cos);
+    // world-space: R = (-cos, sin), F = (sin, cos) — fixes left/right inversion
+    let mx = -axis.x * cos - axis.z * sin;
+    let mz = axis.x * sin - axis.z * cos;
     const len = Math.hypot(mx, mz);
     if (len > 1) { mx /= len; mz /= len; }
 

@@ -76,25 +76,18 @@ canvas#game-canvas { position: absolute; inset: 0; width: 100%; height: 100%; di
   position: absolute; left: 39px; top: 39px; width: 40px; height: 40px; border-radius: 50%;
   background: rgba(212,165,89,0.75); box-shadow: 0 0 14px rgba(212,165,89,0.5);
 }
-#cam-zone {
+#cam-joy-zone {
   position: absolute; right: 0; bottom: 0; width: 50%; height: 100%;
   pointer-events: auto; touch-action: none;
 }
-#cam-label {
-  position: absolute; right: 44px; top: 28px; font-size: 22px; color: rgba(233,220,192,0.32);
-  pointer-events: none; user-select: none;
+#cam-joy-base {
+  position: absolute; right: 72px; bottom: 190px; width: 118px; height: 118px; border-radius: 50%;
+  background: rgba(10,16,24,0.35); border: 1.5px solid rgba(212,165,89,0.35);
 }
-#cam-turn-btns {
-  position: absolute; left: 24px; bottom: 262px; display: flex; gap: 12px;
-  pointer-events: auto; z-index: 5;
+#cam-joy-thumb {
+  position: absolute; left: 39px; top: 39px; width: 40px; height: 40px; border-radius: 50%;
+  background: rgba(212,165,89,0.75); box-shadow: 0 0 14px rgba(212,165,89,0.5);
 }
-.cam-turn-btn {
-  width: 54px; height: 54px; border-radius: 50%; font-size: 19px; cursor: pointer;
-  color: var(--parch); background: rgba(10,16,24,0.4); border: 1.5px solid rgba(233,220,192,0.4);
-  backdrop-filter: blur(4px); pointer-events: auto;
-}
-.cam-turn-btn:active { transform: scale(0.9); }
-#cam-turn-btns.hidden { display: none; }
 #act-buttons { position: absolute; right: 22px; bottom: 66px; display: flex; gap: 18px; pointer-events: auto; align-items: flex-end; }
 .act-btn {
   width: 74px; height: 74px; border-radius: 50%; font-size: 30px; cursor: pointer; color: var(--parch);
@@ -277,9 +270,8 @@ h1 {
   #act-buttons { right: 14px; bottom: 9vh; }
   .act-btn { width: 62px; height: 62px; font-size: 26px; }
   #btn-dash { width: 50px; height: 50px; font-size: 19px; }
-  #cam-turn-btns { left: 16px; bottom: 152px; gap: 8px; }
-  .cam-turn-btn { width: 46px; height: 46px; font-size: 16px; }
-  #cam-label { right: 30px; top: 18px; }
+  #cam-joy-base { right: 46px; bottom: 158px; width: 96px; height: 96px; }
+  #cam-joy-thumb { left: 30px; top: 30px; width: 36px; height: 36px; }
   #hint { bottom: 6px; font-size: 12px; padding: 6px 12px; }
   .icon-btn { width: 34px; height: 34px; font-size: 15px; }
   #top-bar { padding: 0 8px; }
