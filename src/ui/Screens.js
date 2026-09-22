@@ -6,6 +6,7 @@ export class Screens {
     this.title = document.getElementById('screen-title');
     this.credits = document.getElementById('screen-credits');
     this.pause = document.getElementById('screen-pause');
+    this.settings = document.getElementById('screen-settings');
     this.map = document.getElementById('screen-map');
     this.loadScreen = document.getElementById('load-screen');
 
@@ -21,7 +22,45 @@ export class Screens {
     document.getElementById('btn-map').addEventListener('click', () => this.hooks.onMap && this.hooks.onMap());
     document.getElementById('btn-menu').addEventListener('click', () => this.hooks.onPause && this.hooks.onPause());
 
-    // camera sensitivity slider
+    // settings screen
+    const openSettings = () => this.showSettings();
+    document.getElementById('btn-title-settings').addEventListener('click', () => { this._settingsFrom = 'title'; openSettings(); });
+    document.getElementById('btn-pause-settings').addEventListener('click', () => { this._settingsFrom = 'pause'; openSettings(); });
+    document.getElementById('btn-settings-back').addEventListener('click', () => {
+      if (this._settingsFrom === 'pause') this.showPause();
+      else this.showTitle();
+    });
+    const invertBtn = document.getElementById('btn-invert-joy');
+    if (invertBtn) {
+      invertBtn.addEventListener('click', () => {
+        const cur = localStorage.getItem('nuar_invert_joy') === '1';
+        localStorage.setItem('nuar_invert_joy', cur ? '0' : '1');
+        this.hooks.onInvertJoy && this.hooks.onInvertJoy(!cur);
+        invertBtn.textContent = 'Инверсия джойстика: ' + (!cur ? 'вкл' : 'выкл');
+      });
+    }
+    const soundBtn = document.getElementById('btn-sound-toggle');
+    if (soundBtn) {
+      const refreshSound = () => {
+        const muted = this.hooks.getSoundMuted ? this.hooks.getSoundMuted() : false;
+        soundBtn.textContent = 'Звук: ' + (muted ? 'выкл' : 'вкл');
+      };
+      soundBtn.addEventListener('click', () => {
+        this.hooks.onToggleSound && this.hooks.onToggleSound();
+        refreshSound();
+      });
+      this._refreshSound = refreshSound;
+    }
+    const settingsSens = document.getElementById('settings-cam-sens-slider');
+    if (settingsSens) {
+      settingsSens.value = parseFloat(localStorage.getItem('nuar_cam_sens')) || 1.0;
+      settingsSens.addEventListener('input', (e) => {
+        const val = parseFloat(e.target.value);
+        if (this.hooks.onCamSens) this.hooks.onCamSens(val);
+      });
+    }
+
+    // camera sensitivity slider (pause)
     const sensSlider = document.getElementById('cam-sens-slider');
     if (sensSlider) {
       const saved = parseFloat(localStorage.getItem('nuar_cam_sens')) || 1.0;
@@ -35,12 +74,22 @@ export class Screens {
     this.mapUI = new MapUI(document.getElementById('map-canvas'), document.getElementById('map-legend'));
   }
 
-  showTitle() { this.title.classList.remove('hidden'); this.credits.classList.add('hidden'); this.pause.classList.add('hidden'); this.map.classList.add('hidden'); }
-  showCredits() { this.credits.classList.remove('hidden'); }
+  showTitle() { this.title.classList.remove('hidden'); this.credits.classList.add('hidden'); this.pause.classList.add('hidden'); this.settings.classList.add('hidden'); this.map.classList.add('hidden'); if (this._refreshSound) this._refreshSound(); }
+  showCredits() { this.credits.classList.remove('hidden'); this.title.classList.remove('hidden'); }
   hideTitle() { this.title.classList.add('hidden'); }
-  showPause() { this.pause.classList.remove('hidden'); }
+  showPause() { this.pause.classList.remove('hidden'); this.settings.classList.add('hidden'); }
   hidePause() { this.pause.classList.add('hidden'); }
-  showMap() { this.map.classList.remove('hidden'); }
+  showSettings() {
+    this.title.classList.add('hidden');
+    this.pause.classList.add('hidden');
+    this.credits.classList.add('hidden');
+    this.settings.classList.remove('hidden');
+    const invertBtn = document.getElementById('btn-invert-joy');
+    if (invertBtn) invertBtn.textContent = 'Инверсия джойстика: ' + (localStorage.getItem('nuar_invert_joy') === '1' ? 'вкл' : 'выкл');
+    if (this._refreshSound) this._refreshSound();
+  }
+  hideSettings() { this.settings.classList.add('hidden'); }
+  showMap() { this.map.classList.remove('hidden'); this.settings.classList.add('hidden'); }
   hideMap() { this.map.classList.add('hidden'); }
 
   hideLoad() { this.loadScreen.classList.add('hidden'); }

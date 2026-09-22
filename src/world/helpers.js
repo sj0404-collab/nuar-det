@@ -50,12 +50,21 @@ export function windowWall(r, pal, cx, cy, cz, w, h, d, cols = 4, rows = 3) {
     const ri = seed % rows;
     const ix = cx - w / 2 + (ci + 0.5) * (w / cols);
     const iy = cy + (rows - ri - 0.5) * (h / rows);
-    r.decoBox(0xffd98a, ix, iy, cz, (w / (cols * 2)) * 0.72, (h / (rows * 2.4)) * 0.72, 0.16);
-    r.decoBox(0xfff0c0, ix, iy, cz - 0.06, (w / (cols * 2)) * 0.3, (h / (rows * 2.4)) * 0.3, 0.3);
+    r.decoBox(0xffd98a, ix, iy, cz, (w / (cols * 2)) * 0.72, (h / (rows * 2.4)) * 0.72, 0.16, { emission: 0xffb35a, emissionBias: 1.0 });
+    r.decoBox(0xfff0c0, ix, iy, cz - 0.06, (w / (cols * 2)) * 0.3, (h / (rows * 2.4)) * 0.3, 0.3, { emission: 0xffe9b0, emissionBias: 1.2 });
   }
 }
 
-// simple building block with roof ridge, chimneys and parapets
+// glowing neon sign across a facade; opts: { color, glow, h }
+export function neon(r, x, y, z, w, d, textHue = 0xff5a4a, opts = {}) {
+  const h = opts.h || 1.1;
+  const g = opts.glow || textHue;
+  r.decoBox(0x0c0f14, x, y, z, w, h, 0.18, { emission: 0x1c222a, emissionBias: 0.5 });
+  r.decoBox(textHue, x, y + h / 2 + 0.1, z, w - 0.1, 0.4, 0.2, { emission: g, emissionBias: 1.3 });
+  return r;
+}
+
+// building block with roof ridge, chimneys and parapets
 export function building(r, pal, x, z, w, d, h, opts = {}) {
   r.box(pal.wall, x, h / 2, z, w, h, d);
   // street-level trim on the two long faces

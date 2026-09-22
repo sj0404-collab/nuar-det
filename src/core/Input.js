@@ -12,7 +12,7 @@ export class Input {
     this.lensPressed = false;
     this.mapPressed = false;
     this.pausePressed = false;
-    this.camHeld = 0;
+    this.camKeyHeld = 0; // keyboard Q/E (-1/0/+1)
     this.camRate = 0;
     this.camDX = 0;
     this.camDY = 0;
@@ -47,6 +47,12 @@ export class Input {
     return this.touch && this.touch.isTouch;
   }
 
+  // combined camera rotate direction: keyboard Q/E or touch buttons
+  get camHeld() {
+    if (this.camKeyHeld !== 0) return this.camKeyHeld;
+    return (this.usingTouch && this.touch.camHold) || 0;
+  }
+
   bind() {
     window.addEventListener('keydown', (e) => {
       if (e.repeat) return;
@@ -56,8 +62,8 @@ export class Input {
       if (k === ' ' || k === 'arrowup' || k === 'w') { this.jumpHeld = true; this.jumpPressed = true; e.preventDefault(); }
       if (k === 'shift') { this.dashPressed = true; }
       if (k === 'f' || k === 'а') { this.interactPressed = true; }
-      if (k === 'q' || k === 'й') { this.camHeld = -1; }
-      if (k === 'e' || k === 'л') { this.camHeld = 1; }
+      if (k === 'q' || k === 'й') { this.camKeyHeld = -1; }
+      if (k === 'e' || k === 'л') { this.camKeyHeld = 1; }
       if (k === 'l' || k === 'д') { this.lensPressed = true; }
       if (k === 'tab' || k === 'm' || k === 'ь') { this.mapPressed = true; e.preventDefault(); }
       if (k === 'escape' || k === 'p' || k === 'з') { this.pausePressed = true; }
@@ -67,10 +73,10 @@ export class Input {
       const k = e.key.toLowerCase();
       this.keys.delete(k);
       if (k === ' ' || k === 'arrowup' || k === 'w') this.jumpHeld = false;
-      if (k === 'q' || k === 'й') { if (this.camHeld === -1) this.camHeld = 0; }
-      if (k === 'e' || k === 'л') { if (this.camHeld === 1) this.camHeld = 0; }
+      if (k === 'q' || k === 'й') { if (this.camKeyHeld === -1) this.camKeyHeld = 0; }
+      if (k === 'e' || k === 'л') { if (this.camKeyHeld === 1) this.camKeyHeld = 0; }
     });
-    window.addEventListener('blur', () => { this.keys.clear(); this.jumpHeld = false; this.camHeld = 0; this.camRate = 0; this.camDX = 0; this.camDY = 0; });
+    window.addEventListener('blur', () => { this.keys.clear(); this.jumpHeld = false; this.camKeyHeld = 0; this.camRate = 0; this.camDX = 0; this.camDY = 0; });
   }
 
   axis2D() {

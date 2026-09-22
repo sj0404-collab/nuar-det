@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { makePainterlyMaterial } from '../render/Painterly.js';
 import { buildLayoutFrom } from './layout.js';
+import { buildTraffic, updateTraffic } from './Traffic.js';
 
 export const COLORS = {
   street: 0x3f4b57, floor: 0x2a323c, rooftop: 0x343c48,
@@ -35,13 +36,17 @@ class Room {
     this.boxes = [];
     this.oneWays = [];
     this.painted = new Map(); // key: color hex -> geometry array
+    this.outerOpts = new Map(); // key: color hex -> material opts
     this.loaded = false;
   }
 
-  paint(color, geo) {
+  paint(color, geo, opts = {}) {
     const key = color.toString(16);
     if (!this.painted.has(key)) this.painted.set(key, []);
     this.painted.get(key).push(geo);
+    if (opts.emission && !this.outerOpts.has(key)) {
+      this.outerOpts.set(key, opts);
+    }
   }
 
   // solid box (merged geometry for performance)
@@ -63,7 +68,7 @@ class Room {
   decoBox(color, x, y, z, w, h, d, opts = {}) {
     const g = new THREE.BoxGeometry(w, h, d);
     g.translate(x, y, z);
-    this.paint(color, g);
+    this.paint(color, g, opts);
     return this;
   }
 
@@ -203,7 +208,8 @@ export class World {
         } else {
           merged = mergeGeometries(geos);
         }
-        const mat = makePainterlyMaterial(color, { rimStrength: 0.45 });
+        const opts = Object.assign({ rimStrength: 0.45 }, r.outerOpts.get(colorKey) || {});
+        const mat = makePainterlyMaterial(color, opts);
         const mesh = new THREE.Mesh(merged, mat);
         this.scene.add(mesh);
       }
@@ -214,6 +220,7 @@ export class World {
       this.scene.add(m.mesh || m);
     }
     this.buildFogBank();
+    buildTraffic(this);
   }
 
   buildFogBank() {
@@ -251,6 +258,10 @@ export class World {
     for (const f of this.fogSprites) {
       f.s.position.y = f.base + Math.sin(time * f.speed + f.phase) * 0.7;
     }
+  }
+
+  updateTraffic(dt, t) {
+    if (this.traffic) updateTraffic(this.traffic, dt, t);
   }
 
   getColliders() {

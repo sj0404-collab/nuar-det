@@ -1,5 +1,5 @@
 import { COLORS, PALETTES } from './World.js';
-import { pave, windowWall, building, stall, crates, pillar } from './helpers.js';
+import { pave, windowWall, building, stall, crates, pillar, neon } from './helpers.js';
 import { buildWest } from './layout2.js';
 
 export function buildLayoutFrom(world) {
@@ -64,6 +64,14 @@ function buildHub(mk, world) {
   crates(r, -7, 10, 3);
   crates(r, 4, -12, 2);
 
+  // neon shop signs to make the street read as alive
+  neon(r, 24, 2.6, -47.2, 6, 1, 0xff5a4a);   // east, facing +z
+  neon(r, -24, 2.6, -47.2, 6, 1, 0x3fc0e8);  // west
+  neon(r, 42, 2.6, -32.8, 5, 1, 0xe8c23f);
+  neon(r, -42, 2.6, -32.2, 5, 1, 0xb06ae0);
+  neon(r, 40, 2.6, 23.2, 5, 1, 0x5ae08a);
+  neon(r, -34, 2.6, 41.2, 5, 1, 0xff8a5a);
+
   // NPCs
   world.npcs.push({ id: 'rook', name: 'Констебль Грач', face: '🦅', pos: { x: -4, y: 1, z: 14 }, dialogueId: 'rook_intro', room: 'hub' });
   world.npcs.push({ id: 'shade', name: 'Тень на мосту', face: '👤', pos: { x: 4, y: 1, z: -10 }, dialogueId: 'shade_hub', room: 'hub' });
@@ -125,6 +133,9 @@ function buildMarket(mk, world) {
   r.oneWay(112, 2.8, -40, 6, 2, COLORS.goldDark);
 
   r.lamp(112, -38); r.lamp(162, -42); r.lamp(112, 40); r.lamp(160, 40);
+  neon(r, 112, 3.0, -43.2, 8, 1.2, 0x7ee0c8);   // market hall facing alley
+  neon(r, 160, 3.0, -40.8, 6, 1, 0xffc86a);
+  neon(r, 106, 2.2, 46.2, 6, 1, 0x5ae08a);
 
   world.npcs.push({ id: 'tinker', name: 'Жестянщик Грип', face: '🔧', pos: { x: 120, y: 1, z: -6 }, dialogueId: 'tinker_market', room: 'market' });
   world.npcs.push({ id: 'madame', name: 'Госпожа Корвида', face: '🕶', pos: { x: 150, y: 1, z: 10 }, dialogueId: 'madame_first', room: 'market' });

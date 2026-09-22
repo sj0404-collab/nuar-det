@@ -74,6 +74,9 @@ export class Game {
       onMap: () => this.toggleMap(),
       onToTitle: () => this.toTitle(),
       onCamSens: (val) => this.touch.setCamSensitivity(val),
+      onInvertJoy: (val) => this.touch.setInvertJoy(val),
+      onToggleSound: () => this.toggleSound(),
+      getSoundMuted: () => this.audio.muted,
     });
     this.screens.showTitle();
 
@@ -654,6 +657,10 @@ export class Game {
     }
   }
 
+  toggleSound() {
+    this.audio.toggleMute();
+  }
+
   resumeFromPause() {
     if (this.mode === 'pause' || this.mode === 'map') {
       this.mode = 'explore';
@@ -979,8 +986,11 @@ export class Game {
     }
     const cam = this.input.camHeld !== 0 ? this.input.camHeld : 0;
     if (cam !== 0) this.cameraYaw += cam * 2.7 * dt;
-    const dist = 9;
-    const hy = 3.1;
+    // portrait: wider vertical view, pull camera back a little so streets read well
+    const aspect = this.camera.aspect;
+    const portrait = aspect < 1;
+    const dist = portrait ? 11.5 : 9;
+    const hy = portrait ? 3.6 : 3.1;
     const ax = Math.sin(this.cameraYaw) * dist;
     const az = Math.cos(this.cameraYaw) * dist;
     const targetX = p.pos.x - ax;
@@ -1109,6 +1119,7 @@ export class Game {
 
   animateProps(dt) {
     const t = this.clock.elapsedTime;
+    this.world.updateTraffic(dt, t);
     for (const it of this.world.items) {
       if (it.taken) continue;
       it.mesh.position.y = it.pos.y + Math.sin(t * 2 + it.pos.x) * 0.18;

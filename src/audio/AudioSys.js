@@ -31,6 +31,11 @@ export class AudioSys {
     return this.muted;
   }
 
+  setMuted(m) {
+    this.muted = !!m;
+    if (this.master) this.master.gain.value = this.muted ? 0 : 0.5;
+  }
+
   buildAmbient() {
     // wind noise via filtered buffer
     const len = this.ctx.sampleRate * 3;

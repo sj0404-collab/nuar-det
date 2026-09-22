@@ -8,6 +8,8 @@ export class TouchControls {
     this.btnJump = document.getElementById('btn-jump');
     this.btnDash = document.getElementById('btn-dash');
     this.btnInteract = document.getElementById('btn-interact');
+    this.btnCamL = document.getElementById('btn-cam-l');
+    this.btnCamR = document.getElementById('btn-cam-r');
 
     this.onMove = onMove;
     this.onJump = onJump;
@@ -16,6 +18,9 @@ export class TouchControls {
 
     // camera sensitivity (persisted)
     this.camSensitivity = parseFloat(localStorage.getItem('nuar_cam_sens')) || 1.0;
+    // joystick Y: default off (forward = up); user can invert from settings
+    this.invertJoy = localStorage.getItem('nuar_invert_joy') === '1';
+    this.camHold = 0;
 
     this.joyPointer = null;
     this.joyCenter = { x: 0, y: 0 };
@@ -29,6 +34,11 @@ export class TouchControls {
   setCamSensitivity(val) {
     this.camSensitivity = Math.max(0.2, Math.min(3, val));
     localStorage.setItem('nuar_cam_sens', this.camSensitivity.toString());
+  }
+
+  setInvertJoy(val) {
+    this.invertJoy = !!val;
+    localStorage.setItem('nuar_invert_joy', this.invertJoy ? '1' : '0');
   }
 
   get isTouch() {
@@ -48,6 +58,20 @@ export class TouchControls {
     this.btnDash.addEventListener('pointerup', () => { this.onDash(false); });
 
     this.btnInteract.addEventListener('pointerdown', (e) => { e.preventDefault(); this.onInteract && this.onInteract(); });
+
+    // camera rotate buttons (touch equivalent of Q/E)
+    const holdCamBtn = (btn, dir) => {
+      const downFn = (e) => { e.preventDefault(); e.stopPropagation(); this.camHold = dir; };
+      const upFn = (e) => { e.preventDefault(); e.stopPropagation(); if (this.camHold === dir) this.camHold = 0; };
+      btn.addEventListener('pointerdown', downFn);
+      btn.addEventListener('pointerup', upFn);
+      btn.addEventListener('pointercancel', upFn);
+      btn.addEventListener('pointerleave', upFn);
+    };
+    if (this.btnCamL && this.btnCamR) {
+      holdCamBtn(this.btnCamL, -1);
+      holdCamBtn(this.btnCamR, 1);
+    }
 
     this.joyZone.addEventListener('pointerdown', (e) => this.beginJoy(e));
     this.joyZone.addEventListener('pointermove', (e) => this.moveJoy(e));
@@ -109,7 +133,7 @@ export class TouchControls {
     this.joyThumb.style.transform = `translate(${dx}px, ${dy}px)`;
     // dead zone + eased response so small nudges don't drift
     const rawX = dx / this.joyRadius;
-    const rawY = -dy / this.joyRadius;
+    const rawY = (this.invertJoy ? -dy : dy) / this.joyRadius;
     const dead = 0.14;
     const ease = (v) => (Math.abs(v) < dead ? 0 : Math.sign(v) * Math.pow((Math.abs(v) - dead) / (1 - dead), 1.35));
     this.vec.x = ease(rawX);

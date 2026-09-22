@@ -84,6 +84,17 @@ canvas#game-canvas { position: absolute; inset: 0; width: 100%; height: 100%; di
   position: absolute; right: 44px; top: 28px; font-size: 22px; color: rgba(233,220,192,0.32);
   pointer-events: none; user-select: none;
 }
+#cam-turn-btns {
+  position: absolute; left: 24px; bottom: 262px; display: flex; gap: 12px;
+  pointer-events: auto; z-index: 5;
+}
+.cam-turn-btn {
+  width: 54px; height: 54px; border-radius: 50%; font-size: 19px; cursor: pointer;
+  color: var(--parch); background: rgba(10,16,24,0.4); border: 1.5px solid rgba(233,220,192,0.4);
+  backdrop-filter: blur(4px); pointer-events: auto;
+}
+.cam-turn-btn:active { transform: scale(0.9); }
+#cam-turn-btns.hidden { display: none; }
 #act-buttons { position: absolute; right: 22px; bottom: 66px; display: flex; gap: 18px; pointer-events: auto; align-items: flex-end; }
 .act-btn {
   width: 74px; height: 74px; border-radius: 50%; font-size: 30px; cursor: pointer; color: var(--parch);
@@ -247,6 +258,35 @@ h1 {
 #load-screen {
   position: absolute; inset: 0; z-index: 100; display: flex; align-items: center; justify-content: center;
   background: var(--ink); color: var(--gold); letter-spacing: 4px; font-size: 18px; text-transform: uppercase;
+}
+
+#rotate-hint {
+  position: fixed; inset: 0; z-index: 200; display: none; flex-direction: column;
+  align-items: center; justify-content: center; gap: 18px; text-align: center;
+  background: var(--ink); color: var(--parch); padding: 24px; font-size: 17px; letter-spacing: 1px;
+}
+#rotate-hint .phone { font-size: 42px; animation: tilt 1.6s ease-in-out infinite; }
+@keyframes tilt { 0%,100% { transform: rotate(0deg); } 20% { transform: rotate(90deg); } 40% { transform: rotate(90deg); } 60% { transform: rotate(0deg); } }
+@media (orientation: landscape) and (max-width: 900px) and (hover: none) {
+  #rotate-hint { display: flex; }
+}
+
+@media (orientation: portrait) and (max-width: 640px) {
+  #joy-base { left: 22%; bottom: 9vh; width: 104px; height: 104px; }
+  #joy-thumb { left: 34px; top: 34px; width: 36px; height: 36px; }
+  #act-buttons { right: 14px; bottom: 9vh; }
+  .act-btn { width: 62px; height: 62px; font-size: 26px; }
+  #btn-dash { width: 50px; height: 50px; font-size: 19px; }
+  #cam-turn-btns { left: 16px; bottom: 152px; gap: 8px; }
+  .cam-turn-btn { width: 46px; height: 46px; font-size: 16px; }
+  #cam-label { right: 30px; top: 18px; }
+  #hint { bottom: 6px; font-size: 12px; padding: 6px 12px; }
+  .icon-btn { width: 34px; height: 34px; font-size: 15px; }
+  #top-bar { padding: 0 8px; }
+  #case-label { font-size: 11px; padding: 4px 8px; }
+  .log-chip { font-size: 10px; padding: 3px 8px; }
+  .ability-ico { width: 26px; height: 26px; font-size: 13px; }
+  #dialogue-box { bottom: 108px; }
 }
 
 @media (max-width: 640px) {
