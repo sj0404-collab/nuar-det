@@ -233,6 +233,38 @@ export class AudioSys {
         this.tone(-14, 1.1, t, 0.1, 1, 'sawtooth', 150);
         this.tone(-19, 1.1, t, 0.1, 1, 'sawtooth', 120);
         break;
+      // --- звук заставок/синематографа ---
+      case 'thunder':
+        this.noiseBurst(1.1, 160, 0.16);
+        this.tone(-22, 1.6, t, 0.1, 1, 'sawtooth', 70);
+        setTimeout(() => this.noiseBurst(0.5, 120, 0.07), 220);
+        break;
+      case 'riser':
+        for (let i = 0; i < 6; i++) {
+          this.tone(i * 3, 0.7, t + i * 0.11, 0.05, 1, 'triangle', 220);
+        }
+        break;
+      case 'sting':
+        this.tone(0, 1.2, t, 0.09, 1, 'sawtooth', 165);
+        this.tone(-5, 1.4, t + 0.04, 0.08, 1, 'triangle', 165);
+        break;
+      case 'whoosh':
+        this.noiseBurst(0.75, 900, 0.07);
+        break;
+      case 'heart':
+        this.tone(-8, 0.22, t, 0.12, 1, 'sine', 82);
+        setTimeout(() => this.tone(-5, 0.3, t + 0.26, 0.1, 1, 'sine', 82), 260);
+        break;
+      case 'bell':
+        this.tone(12, 1.6, t, 0.08, 1, 'sine', 520);
+        this.tone(19, 1.3, t + 0.02, 0.05, 1, 'sine', 520);
+        break;
+      case 'riffle':
+        for (let i = 0; i < 4; i++) this.noiseBurst(0.07, 2600, 0.035);
+        break;
+      case 'footsteps':
+        for (let i = 0; i < 5; i++) setTimeout(() => this.sfx('step'), i * 430);
+        break;
       default: break;
     }
   }

@@ -19,6 +19,8 @@ export class Screens {
       this.hooks.onExploreStart && this.hooks.onExploreStart();
     });
     document.getElementById('btn-credits').addEventListener('click', () => this.showCredits());
+    document.getElementById('btn-intro').addEventListener('click', () => this.hooks.onWorldIntro && this.hooks.onWorldIntro());
+    document.getElementById('btn-intro-pause').addEventListener('click', () => this.hooks.onWorldIntro && this.hooks.onWorldIntro());
     document.getElementById('btn-back-title').addEventListener('click', () => this.showTitle());
     document.getElementById('btn-resume').addEventListener('click', () => this.hooks.onResume && this.hooks.onResume());
     document.getElementById('btn-map-full').addEventListener('click', () => { this.showMap(); });
@@ -255,8 +257,10 @@ export class Screens {
     const row = document.getElementById('persona-row');
     if (!row || row.childElementCount) return;
     for (const p of PERSONAS) {
-      const b = document.createElement('button');
+      const b = document.createElement('div');
       b.className = 'persona-btn';
+      b.setAttribute('role', 'button');
+      b.tabIndex = 0;
       b.dataset.persona = p.id;
       b.style.setProperty('--persona-hue', p.hue);
       const name = document.createElement('span');
@@ -265,8 +269,16 @@ export class Screens {
       const blurb = document.createElement('span');
       blurb.className = 'persona-blurb';
       blurb.textContent = p.blurb;
+      const trailer = document.createElement('span');
+      trailer.className = 'persona-trailer';
+      trailer.textContent = 'Заставка героя';
+      trailer.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (this.hooks.onPersonaIntro) this.hooks.onPersonaIntro(p);
+      });
       b.appendChild(name);
       b.appendChild(blurb);
+      b.appendChild(trailer);
       b.addEventListener('click', () => {
         if (this.hooks.onPersonaSet) this.hooks.onPersonaSet(p);
         this.refreshPersona(p.id);
