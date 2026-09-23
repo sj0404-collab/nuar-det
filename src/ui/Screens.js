@@ -126,6 +126,7 @@ export class Screens {
         localStorage.setItem('nuar_voice_engine', e.target.value);
         this.hooks.onVoiceEngineChange && this.hooks.onVoiceEngineChange(e.target.value);
         this.refreshVoiceProfiles();
+        this.refreshVoiceCaps();
       });
     }
 
@@ -135,10 +136,61 @@ export class Screens {
 
     const previewBtn = document.getElementById('btn-voice-preview');
     if (previewBtn) {
-      previewBtn.addEventListener('click', () => this.hooks.onVoicePreview && this.hooks.onVoicePreview());
+      previewBtn.addEventListener('click', () => {
+        this.hooks.onVoicePreview && this.hooks.onVoicePreview();
+        this.refreshVoiceLast();
+      });
+    }
+
+    // TTS relay
+    this.capsEl = document.getElementById('voice-caps');
+    this.lastVoiceEl = document.getElementById('voice-last');
+    this.relayInput = document.getElementById('tts-relay-input');
+    if (this.relayInput) {
+      this.relayInput.value = localStorage.getItem('nuar_tts_relay') || '';
+      const relaySave = document.getElementById('btn-relay-save');
+      if (relaySave) {
+        relaySave.addEventListener('click', () => {
+          const val = (this.relayInput.value || '').trim();
+          localStorage.setItem('nuar_tts_relay', val);
+          this.hooks.onRelayChange && this.hooks.onRelayChange(val);
+          this.refreshVoiceCaps();
+        });
+      }
+      const relayTest = document.getElementById('btn-relay-test');
+      if (relayTest) {
+        relayTest.addEventListener('click', () => this.hooks.onRelayTest && this.hooks.onRelayTest());
+      }
     }
 
     this.mapUI = new MapUI(document.getElementById('map-canvas'), document.getElementById('map-legend'));
+  }
+
+  // показываем, какие движки реально доступны в этом окружении
+  refreshVoiceCaps() {
+    if (this.relayInput) {
+      const cur = localStorage.getItem('nuar_tts_relay') || '';
+      if (this.relayInput.value !== cur) this.relayInput.value = cur;
+    }
+    if (!this.capsEl) return;
+    const caps = this.hooks.getVoiceCaps ? this.hooks.getVoiceCaps() : null;
+    if (!caps) { this.capsEl.textContent = ''; return; }
+    const mark = (ok, name) => `<span class="${ok ? 'ok' : 'no'}">${ok ? '✓' : '✗'}</span> ${name}`;
+    const parts = [
+      mark(caps.edge, 'Edge TTS'),
+      mark(caps.google, 'Google TTS'),
+      mark(caps.web, 'Голос устройства'),
+      mark(caps.synth, 'Локальный синтезатор'),
+    ];
+    const relay = localStorage.getItem('nuar_tts_relay');
+    if (relay) parts.push(`<span class="ok">✓</span> релей: ${relay}`);
+    this.capsEl.innerHTML = parts.join('<br>');
+  }
+
+  refreshVoiceLast() {
+    if (!this.lastVoiceEl) return;
+    const name = this.hooks.getVoiceLast ? this.hooks.getVoiceLast() : '—';
+    this.lastVoiceEl.textContent = 'Последний голос: ' + name;
   }
 
   refreshVoiceProfiles() {
@@ -147,9 +199,9 @@ export class Screens {
     const profiles = {
       auto: ['Системный (авто)'],
       edge: ['ru-RU-DmitryNeural', 'ru-RU-SvetlanaNeural'],
-      google: ['Google ru-RU'],
-      web: ['Web Speech (браузер)'],
-      synth: ['Локальный (espeak)']
+      google: ['ru-RU-Standard-A', 'ru-RU-Standard-B'],
+      web: ['Голос устройства (Android TTS / Web Speech)'],
+      synth: ['Локальный синтезатор (WebAudio)'],
     };
     const list = profiles[engine] || profiles.auto;
     this.voiceProfileSelect.innerHTML = '';
@@ -186,6 +238,8 @@ export class Screens {
     if (this._refreshVoice) this._refreshVoice();
     if (this._refreshTime) this._refreshTime();
     this.refreshVoiceProfiles();
+    this.refreshVoiceCaps();
+    this.refreshVoiceLast();
   }
   hideSettings() { this.settings.classList.add('hidden'); }
   showMap() { this.map.classList.remove('hidden'); this.settings.classList.add('hidden'); }

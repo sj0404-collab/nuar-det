@@ -1,13 +1,20 @@
-// TTS facade for dialogue. Source priority:
-//   1. Edge TTS cloud voices — direct WS in Microsoft Edge, or an optional
-//      self-hosted OpenAI-compatible relay (localStorage `nuar_tts_relay`)
-//      on other browsers/WebViews
-//   2. Web Speech API (system voices)
-//   3. WebAudio oscillator "declaimer" fallback (works offline, no voices)
+// TTS facade for dialogue. Each engine has a real endpoint / source:
+//   1. `edge`   — Microsoft Edge Read Aloud cloud TTS over WebSocket
+//                 (direct in Edge, or via the bundled relay tools/tts-relay.js)
+//   2. `google` — Google Translate TTS (translate_tts mp3 + clients5 JSON base64)
+//   3. `web`    — device voices: native Android TextToSpeech bridge
+//                 (`window.NuarTTS`) or the browser Web Speech API
+//   4. `synth`  — local WebAudio "declaimer", always works offline
+//   `auto` walks the chain by availability.
 const NOTE = 110;
 const EDGE_WSS = 'wss://speech.platform.bing.com/consumer/speech/synthesize/readaloud/edge/v1';
 const EDGE_TOKEN = '6A5AA1D4EAFF4E9FB37E23D68491D6F4';
 const EDGE_TIMEOUT = 8000;
+// Google Translate TTS: mp3 endpoint (limit ~200 chars per request) and the
+// newer JSON endpoint Chrome itself uses (base64 mp3 in payload[1]).
+const GTTS_URL = 'https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=ru&q=';
+const GTTS_CHUNK = 180;
+const CLIENTS5_URL = 'https://clients5.google.com/translate_a/t?client=dict-chrome-ex&sl=ru&tl=en&q=';
 
 export class VoiceEngine {
   constructor(audio) {
@@ -25,6 +32,10 @@ export class VoiceEngine {
     this._edgeTimer = null;
     this._source = null;
     this.profile = localStorage.getItem('nuar_voice_profile') || '';
+    // мост Android вызывает это в конце реплики
+    try {
+      if (typeof window !== 'undefined') window.__ttsDone = () => this.notifyDone();
+    } catch (e) { /* ignore */ }
     this._tryLoadVoices();
   }
 
@@ -41,6 +52,27 @@ export class VoiceEngine {
   }
 
   get supportedWeb() { return !!(this.synth && this.voices.length); }
+
+  // нативный мост Android TextToSpeech, добавляется оболочкой APK
+  get androidTTS() {
+    return (typeof window !== 'undefined' && window.NuarTTS) ? window.NuarTTS : null;
+  }
+
+  get supportedAndroid() {
+    const b = this.androidTTS;
+    return !!(b && typeof b.speak === 'function');
+  }
+
+  // что реально доступно в этом окружении (для UI настроек)
+  capabilities() {
+    return {
+      edge: this.supportedEdge,
+      google: true, // http-запрос работает из WebView напрямую
+      web: this.supportedAndroid || this.supportedWeb,
+      android: this.supportedAndroid,
+      synth: true,
+    };
+  }
 
   get isEdgeBrowser() {
     try { return /Edg\//i.test(navigator.userAgent); } catch (e) { return false; }
@@ -77,12 +109,53 @@ export class VoiceEngine {
     }
   }
 
+  // адрес релея используется и для Edge, и для Google (там он снимает CORS)
+  setRelay(url) {
+    this._edgeRelay = String(url || '').trim();
+    localStorage.setItem('nuar_tts_relay', this._edgeRelay);
+    this.stop();
+  }
+
+  // вызывается нативным мостом Android, когда реплика договорена
+  notifyDone() {
+    if (this._ttsTimer) { clearTimeout(this._ttsTimer); this._ttsTimer = null; }
+    this.speaking = false;
+  }
+
   stop() {
     try { if (this.synth) this.synth.cancel(); } catch (e) {}
     if (this._source) { try { this._source.stop(); } catch (e) {} this._source = null; }
+    if (this._audioEl) { try { this._audioEl.pause(); } catch (e) {} this._audioEl = null; }
+    if (this._gTimer) { clearTimeout(this._gTimer); this._gTimer = null; }
+    const bridge = this.androidTTS;
+    if (bridge && typeof bridge.stop === 'function') { try { bridge.stop(); } catch (e) {} }
     this._cleanupEdge();
     this._killSynth();
     this.speaking = false;
+  }
+
+  // режет текст на куски <= limit, не разрывая слова
+  _chunkText(text, limit) {
+    const clean = String(text).replace(/\s+/g, ' ').trim();
+    if (!clean) return [];
+    if (clean.length <= limit) return [clean];
+    const parts = [];
+    let cur = '';
+    for (const word of clean.split(' ')) {
+      if (!cur) { cur = word; continue; }
+      if ((cur + ' ' + word).length <= limit) {
+        cur += ' ' + word;
+      } else {
+        parts.push(cur);
+        cur = word;
+        while (cur.length > limit) {
+          parts.push(cur.slice(0, limit));
+          cur = cur.slice(limit);
+        }
+      }
+    }
+    if (cur) parts.push(cur);
+    return parts.filter(Boolean);
   }
 
   speak(line, profile = {}) {
@@ -90,20 +163,123 @@ export class VoiceEngine {
     this.stop();
     const mode = this.mode;
     if (mode === 'synth') { this._speakSynth(line, profile); return; }
-    if (mode === 'web' || (mode === 'auto' && !this.supportedEdge)) {
-      this._speakWebThenSynth(line, profile);
+    if (mode === 'google') {
+      this._speakGoogle(line, profile, (ok) => { if (!ok) this._speakWebThenSynth(line, profile); });
       return;
     }
-    // edge or auto → Edge TTS first
-    this._speakEdge(line, profile, (ok) => {
-      if (!ok) this._speakWebThenSynth(line, profile);
-    });
+    if (mode === 'web') { this._speakWebThenSynth(line, profile); return; }
+    if (mode === 'edge') {
+      this._speakEdge(line, profile, (ok) => { if (!ok) this._speakGoogle(line, profile, (ok2) => { if (!ok2) this._speakSynth(line, profile); }); });
+      return;
+    }
+    // auto: Edge → Google → системный голос → локальный синтезатор
+    if (this.supportedEdge) {
+      this._speakEdge(line, profile, (ok) => {
+        if (ok) return;
+        this._speakGoogle(line, profile, (ok2) => { if (!ok2) this._speakWebThenSynth(line, profile); });
+      });
+      return;
+    }
+    this._speakGoogle(line, profile, (ok) => { if (!ok) this._speakWebThenSynth(line, profile); });
+  }
+
+  // --- 2. Google Translate TTS ---
+  // Три пути, по очереди:
+  //   1) релей (если задан) — mp3 с CORS, читаем байты и играем через WebAudio;
+  //   2) прямой mp3 через <audio> — CORS не нужен, но звучит системный плеер;
+  //   3) JSON-эндпоинт clients5 с base64 (если он ещё отдаёт аудио).
+  _speakGoogle(line, profile, cb) {
+    const chunks = this._chunkText(line, GTTS_CHUNK);
+    if (!chunks.length) { cb(false); return; }
+    let i = 0;
+    const playNext = () => {
+      if (i >= chunks.length) { this.speaking = false; cb(true); return; }
+      const text = chunks[i++];
+      this._googleChunk(text, profile, (ok) => {
+        if (!ok) { this.speaking = false; cb(false); return; }
+        setTimeout(playNext, 60);
+      });
+    };
+    this.speaking = true;
+    playNext();
+  }
+
+  // токен gTTS: без него endpoint иногда отдаёт HTML-ошибку вместо mp3
+  _gttsToken(text) {
+    const bytes = new TextEncoder().encode(text);
+    let buf = 0;
+    let len = 0;
+    for (const c of bytes) {
+      buf = c;
+      len += buf * (len + 1);
+      if (len >= 0x8000) {
+        len = 0;
+        len += (buf ^ 0xff) << 24 >> 2;
+      }
+      while (len & 0xffff0000) len = (len & 0x7fffffff) >> 1;
+    }
+    return len >>> 0;
+  }
+
+  _googleChunk(text, profile, cb) {
+    const rate = this._clamp(profile.rate !== undefined ? profile.rate : 1, 0.5, 2);
+    const tl = profile.tl || 'ru';
+    // Google принимает ttspeed только в диапазоне 0.24…0.99
+    const speed = Math.max(0.24, Math.min(0.99, rate * 0.45 + 0.32)).toFixed(2);
+    const tk = this._gttsToken(text);
+    const direct = `${GTTS_URL}${encodeURIComponent(text)}&ttspeed=${speed}&tk=${tk}&total=1&idx=0&textlen=${text.length}`;
+
+    if (this._edgeRelay) {
+      // 1) релей: CORS открыт, байты читаем и играем через общий WebAudio
+      const base = String(this._edgeRelay).replace(/\/+$/, '');
+      fetch(base + '/google?text=' + encodeURIComponent(text) + '&tl=' + encodeURIComponent(tl), { mode: 'cors' })
+        .then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(new Error('relay ' + r.status))))
+        .then((buf) => this._playBuf(buf, cb))
+        .catch(() => this._googleDirect(text, direct, cb));
+      return;
+    }
+    this._googleDirect(text, direct, cb);
+  }
+
+  _googleDirect(text, url, cb) {
+    let settled = false;
+    const finish = (ok) => { if (settled) return; settled = true; this._audioEl = null; if (this._gTimer) { clearTimeout(this._gTimer); this._gTimer = null; } cb(ok); };
+    const tryJson = () => {
+      if (settled) return;
+      if (typeof fetch !== 'function') { finish(false); return; }
+      fetch(CLIENTS5_URL + encodeURIComponent(text), { mode: 'cors', credentials: 'omit' })
+        .then((r) => (r.ok ? r.text() : Promise.reject(new Error('http ' + r.status))))
+        .then((txt) => {
+          const json = JSON.parse(txt);
+          const b64 = json && json[1] && typeof json[1] === 'string' ? json[1] : '';
+          if (!b64) throw new Error('no audio');
+          const bin = atob(b64);
+          const bytes = new Uint8Array(bin.length);
+          for (let k = 0; k < bin.length; k++) bytes[k] = bin.charCodeAt(k);
+          this._playBuf(bytes.buffer, finish);
+        })
+        .catch(() => finish(false));
+    };
+    try {
+      const a = new Audio(url);
+      this._audioEl = a;
+      this._markSource('google');
+      a.volume = this.audio.muted ? 0 : 1;
+      a.onended = () => finish(true);
+      a.onerror = () => tryJson();
+      const p = a.play();
+      if (p && typeof p.catch === 'function') p.catch(() => tryJson());
+      this._gTimer = setTimeout(() => tryJson(), 2500);
+    } catch (e) {
+      tryJson();
+    }
   }
 
   // --- 1. Edge TTS cloud ---
   _speakEdge(line, profile, cb) {
     if (!this.supportedEdge) { cb(false); return; }
     if (this._edgeRelay) { this._relaySpeech(line, profile, cb); return; }
+    this._edgePending = true;
     const ws = new WebSocket(`${EDGE_WSS}?TrustedClientToken=${EDGE_TOKEN}&ConnectionId=${this._uuid()}`);
     this._edgeWs = ws;
     const chunks = [];
@@ -111,6 +287,7 @@ export class VoiceEngine {
     const fail = () => { this._cleanupEdge(); cb(false); };
     this._edgeTimer = setTimeout(fail, EDGE_TIMEOUT);
     ws.onopen = () => {
+      this._markSource('edge');
       const ts = new Date().toISOString().replace(/\.\d{3}Z$/, '.0000');
       ws.send('X-Timestamp:' + ts + '\r\nContent-Type:application/json; charset=utf-8\r\nPath:speech.config\r\n\r\n'
         + '{"context":{"synthesis":{"audio":{"metadataoptions":{"sentenceBoundaryEnabled":"false","wordBoundaryEnabled":"true"},"outputFormat":"audio-24khz-48kbitrate-mono-mp3"}}}}');
@@ -165,6 +342,7 @@ export class VoiceEngine {
 
   // self-hosted OpenAI-compatible Edge TTS relay (/v1/audio/speech)
   _relaySpeech(line, profile, cb) {
+    this._markSource('edge');
     const base = String(this._edgeRelay).replace(/\/+$/, '');
     fetch(base + '/v1/audio/speech', {
       method: 'POST',
@@ -203,6 +381,18 @@ export class VoiceEngine {
     }).catch(() => { this.speaking = false; cb(false); });
   }
 
+  // имя движка, который реально озвучил последнюю реплику (для настроек)
+  _markSource(name) { this.lastSource = name; }
+
+  sourceName() {
+    if (this.lastSource === 'android') return 'Системный голос Android';
+    if (this.lastSource === 'edge') return 'Edge TTS';
+    if (this.lastSource === 'google') return 'Google TTS';
+    if (this.lastSource === 'web') return 'Web Speech (браузер)';
+    if (this.lastSource === 'synth') return 'Локальный синтезатор';
+    return '—';
+  }
+
   _cleanupEdge() {
     if (this._edgeTimer) { clearTimeout(this._edgeTimer); this._edgeTimer = null; }
     if (this._edgeWs) {
@@ -212,8 +402,28 @@ export class VoiceEngine {
     }
   }
 
-  // --- 2. Web Speech API ---
+  // --- 3. Системные голоса устройства: Android TextToSpeech → Web Speech → synth ---
   _speakWebThenSynth(line, profile) {
+    const bridge = this.androidTTS;
+    if (this.supportedAndroid && bridge) {
+      this.speaking = true;
+      const rate = this._clamp(profile.rate !== undefined ? profile.rate : 1, 0.5, 2);
+      const pitch = this._clamp(profile.pitch !== undefined ? profile.pitch : 1, 0.5, 2);
+      const ok = bridge.speak(line, rate, pitch);
+      if (ok !== false) {
+        this._markSource('android');
+        // мост вызывает window.__ttsDone() по окончании реплики; подстрахуемся
+        // таймером, чтобы флаг speaking не залип навсегда
+        if (this._ttsTimer) clearTimeout(this._ttsTimer);
+        const estMs = Math.max(1500, String(line).length * 95);
+        this._ttsTimer = setTimeout(() => {
+          this._ttsTimer = null;
+          if (this.speaking && this.lastSource === 'android') this.speaking = false;
+        }, estMs + 4000);
+        return;
+      }
+      this.speaking = false;
+    }
     if (!this.supportedWeb) { this._speakSynth(line, profile); return; }
     this.speaking = true;
     try {
@@ -224,6 +434,7 @@ export class VoiceEngine {
       u.pitch = this._clamp(profile.pitch !== undefined ? profile.pitch : 1, 0, 2);
       const v = this._pickVoice(profile);
       if (v) u.voice = v;
+      this._markSource('web');
       u.onend = () => { this.speaking = false; };
       u.onerror = () => {
         this.speaking = false;
@@ -254,6 +465,7 @@ export class VoiceEngine {
     const ctx = this.audio.ctx || (this.audio.init(), this.audio.ctx);
     if (!ctx) { this.speaking = false; return; }
     this.speaking = true;
+    this._markSource('synth');
     const p = Object.assign({ base: -2, rate: 1, waveform: 'sine', pitch: 1, jitter: 0.08, echo: 0, volume: 0.3 }, profile);
     const rising = /[?？]\s*$/.test(line);
     const exclaim = /[!！]\s*$/.test(line);

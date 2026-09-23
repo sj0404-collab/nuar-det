@@ -15,9 +15,12 @@ import android.os.Environment;
 import android.os.Handler;
 import android.os.Looper;
 import android.provider.Settings;
+import android.speech.tts.TextToSpeech;
+import android.speech.tts.UtteranceProgressListener;
 import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
+import android.webkit.JavascriptInterface;
 import android.webkit.CookieManager;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
@@ -36,6 +39,7 @@ import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.util.Locale;
 
 import androidx.webkit.WebViewCompat;
 
@@ -57,6 +61,88 @@ public class MainActivity extends Activity {
     private boolean isDownloading = false;
     private boolean pageReady = false;
     private String remoteVersion = "";
+
+    /**
+     * Мост к системному синтезу речи Android. В WebView нет движка TTS,
+     * поэтому Web Speech API там молчит — этот мост даёт настоящие голоса
+     * устройства (работает офлайн, если установлен русский голос).
+     */
+    private class NuarTtsBridge {
+        private TextToSpeech tts;
+        private boolean ready = false;
+        private boolean ruAvailable = false;
+        private final String[] pending = new String[1];
+
+        private void ensure() {
+            if (tts != null) return;
+            tts = new TextToSpeech(MainActivity.this, status -> {
+                ready = (status == TextToSpeech.SUCCESS);
+                if (ready) {
+                    Locale ru = new Locale("ru", "RU");
+                    int r = tts.isLanguageAvailable(ru);
+                    if (r == TextToSpeech.LANG_MISSING_DATA || r == TextToSpeech.LANG_NOT_SUPPORTED) {
+                        ruAvailable = tts.isLanguageAvailable(Locale.ROOT) >= TextToSpeech.LANG_AVAILABLE;
+                        tts.setLanguage(Locale.ROOT);
+                    } else {
+                        ruAvailable = true;
+                        tts.setLanguage(ru);
+                    }
+                    tts.setOnUtteranceProgressListener(new UtteranceProgressListener() {
+                        @Override public void onStart(String id) { }
+                        @Override public void onDone(String id) { runOnUiThread(() -> web.evaluateJavascript("window.__ttsDone&&window.__ttsDone();", null)); }
+                        @Override public void onError(String id) { runOnUiThread(() -> web.evaluateJavascript("window.__ttsDone&&window.__ttsDone();", null)); }
+                    });
+                }
+                if (pending[0] != null) {
+                    String line = pending[0];
+                    pending[0] = null;
+                    doSpeak(line, 1f, 1f);
+                }
+            });
+        }
+
+        @JavascriptInterface
+        public boolean available() {
+            ensure();
+            return ready && ruAvailable;
+        }
+
+        @JavascriptInterface
+        public boolean speak(String text, double rate, double pitch) {
+            if (text == null || text.trim().isEmpty()) return false;
+            ensure();
+            if (!ready) { pending[0] = text; return true; }
+            return doSpeak(text, (float) rate, (float) pitch);
+        }
+
+        private boolean doSpeak(String text, float rate, float pitch) {
+            try {
+                tts.setSpeechRate(Math.max(0.4f, Math.min(2.0f, rate)));
+                tts.setPitch(Math.max(0.5f, Math.min(2.0f, pitch)));
+                int res = tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, "nuar-" + System.currentTimeMillis());
+                return res == TextToSpeech.SUCCESS;
+            } catch (Throwable t) {
+                return false;
+            }
+        }
+
+        @JavascriptInterface
+        public void stop() {
+            try { if (tts != null) tts.stop(); } catch (Throwable ignored) {}
+        }
+
+        @JavascriptInterface
+        public String voiceInfo() {
+            ensure();
+            if (!ready) return "инициализация…";
+            if (!ruAvailable) return "нет русского голоса (установите Google TTS)";
+            try {
+                return tts.getDefaultVoice() != null ? tts.getDefaultVoice().getName() : "ru-RU";
+            } catch (Throwable t) {
+                return "ru-RU";
+            }
+        }
+    }
 
     private final BroadcastReceiver downloadReceiver = new BroadcastReceiver() {
         @Override
@@ -146,6 +232,7 @@ public class MainActivity extends Activity {
         });
 
         setContentView(web);
+        web.addJavascriptInterface(new NuarTtsBridge(), "NuarTTS");
         web.loadUrl(GAME_URL);
         registerReceiver(downloadReceiver, new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE));
     }

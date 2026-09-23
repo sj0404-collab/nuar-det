@@ -116,6 +116,10 @@ export class Game {
       onVoiceEngineChange: (engine) => this.voice.setMode(engine),
       onVoiceProfileChange: (profile) => this.voice.setProfile(profile),
       onVoicePreview: () => this.previewVoice(),
+      getVoiceCaps: () => this.voice.capabilities(),
+      getVoiceLast: () => this.voice.sourceName(),
+      onRelayChange: (url) => { this.voice.setRelay(url); },
+      onRelayTest: () => this.testRelay(),
       onTimeSpeed: (mode) => this.setTimeMode(mode),
       getTimeMode: () => this.timeMode,
       hasSave: () => this.hasSave(),
@@ -702,6 +706,21 @@ export class Game {
     const sprite = new THREE.Sprite(mat);
     sprite.scale.set(c.width / 90, c.height / 90, 1);
     return sprite;
+  }
+
+  async testRelay() {
+    const base = String(localStorage.getItem('nuar_tts_relay') || '').replace(/\/+$/, '');
+    if (!base) { this.hud.toast('Адрес релея не задан.'); return; }
+    this.hud.toast('Проверяю релей…');
+    try {
+      const r = await fetch(base + '/health');
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const j = await r.json();
+      this.hud.toast(`Релей отвечает: ${j.service || 'ok'}`);
+      this.screens.refreshVoiceCaps();
+    } catch (e) {
+      this.hud.toast('Релей недоступен: ' + (e.message || e));
+    }
   }
 
   previewVoice() {

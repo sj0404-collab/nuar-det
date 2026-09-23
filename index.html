@@ -140,17 +140,27 @@
           <div class="setting-row">
             <label>Движок озвучки</label>
             <select id="voice-engine-select">
-              <option value="auto">Авто</option>
-              <option value="edge">Edge TTS (облако)</option>
+              <option value="auto">Авто (Edge → Google → устройство)</option>
+              <option value="edge">Edge TTS (Microsoft, облако)</option>
               <option value="google">Google Translate TTS</option>
-              <option value="web">Web Speech API</option>
-              <option value="synth">Локальный синтезатор</option>
+              <option value="web">Голос устройства (Android TTS / Web Speech)</option>
+              <option value="synth">Локальный синтезатор (офлайн)</option>
             </select>
+            <div id="voice-caps" class="tts-caps"></div>
           </div>
           <div class="setting-row">
             <label>Голос (профиль)</label>
             <select id="voice-profile-select"></select>
             <button id="btn-voice-preview" class="menu-btn small">Прослушать пример</button>
+            <div id="voice-last" class="tts-caps">Последний голос: —</div>
+          </div>
+          <div class="setting-row">
+            <label>Релей озвучки (если облако блокирует)</label>
+            <input id="tts-relay-input" type="url" inputmode="url" placeholder="http://192.168.1.10:8787">
+            <div class="setting-actions">
+              <button id="btn-relay-save" class="menu-btn small">Сохранить адрес</button>
+              <button id="btn-relay-test" class="menu-btn small">Проверить релей</button>
+            </div>
           </div>
           <button id="btn-settings-back" class="menu-btn">Назад</button>
         </div>
