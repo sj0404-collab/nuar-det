@@ -21,6 +21,7 @@ import { buildAnimeEyes, buildAnimeHair, buildAnimeMouth, makeToon } from './ren
 import { Effects } from './render/Particles.js';
 import { GlowSprites } from './render/GlowSprites.js';
 import { HoloArena } from './render/HoloArena.js';
+import { buildPedestrians, updatePedestrians } from './world/Pedestrians.js';
 
 const ABILITY_KEYS = { dash: 'dash', jump: 'jump', wall: 'wall', lens: 'lens' };
 
@@ -121,6 +122,7 @@ export class Game {
     this.buildItems();
     this.buildChests();
     this.buildNpcs();
+    this.buildCitizens();
     this.buildEnemies();
     this.initPanelListeners();
 
@@ -341,6 +343,10 @@ export class Game {
       this.scene.add(light);
       n.light = light;
     }
+  }
+
+  buildCitizens() {
+    buildPedestrians(this.world);
   }
 
   buildLowPolyFigure(n) {
@@ -1276,6 +1282,7 @@ this.player.grounded = true;
   animateProps(dt) {
     const t = this.clock.elapsedTime;
     this.world.updateTraffic(dt, t);
+    updatePedestrians(this.world.peds, this.world.pedsProps, dt, t);
     for (const it of this.world.items) {
       if (it.taken) continue;
       it.mesh.position.y = it.pos.y + Math.sin(t * 2 + it.pos.x) * 0.18;
