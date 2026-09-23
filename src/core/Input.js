@@ -15,6 +15,7 @@ export class Input {
     this.camKeyHeld = 0; // keyboard Q/E (-1/0/+1)
     this.camJoyX = 0;
     this.camJoyY = 0;
+    this.camModePressed = false;
 
     this.bind();
     if (this.touch) {
@@ -66,6 +67,7 @@ export class Input {
       if (k === 'tab' || k === 'm' || k === 'ь') { this.mapPressed = true; e.preventDefault(); }
       if (k === 'escape' || k === 'p' || k === 'з') { this.pausePressed = true; }
       if (k === 'c') { this.deckPressed = true; }
+      if (k === 'v') { this.camModePressed = true; }
     });
     window.addEventListener('keyup', (e) => {
       const k = e.key.toLowerCase();
@@ -102,6 +104,7 @@ export class Input {
       map: this.mapPressed,
       pause: this.pausePressed,
       deck: this.deckPressed,
+      camMode: this.camModePressed,
     };
     this._jump = out.jump;
     this._dash = out.dash;
@@ -112,6 +115,7 @@ export class Input {
     this.mapPressed = false;
     this.pausePressed = false;
     this.deckPressed = false;
+    this.camModePressed = false;
     this.pressed.clear();
     return out;
   }

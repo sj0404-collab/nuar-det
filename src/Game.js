@@ -22,6 +22,7 @@ import { Effects } from './render/Particles.js';
 import { GlowSprites } from './render/GlowSprites.js';
 import { HoloArena } from './render/HoloArena.js';
 import { buildPedestrians, updatePedestrians } from './world/Pedestrians.js';
+import { Minimap } from './ui/Minimap.js';
 
 const ABILITY_KEYS = { dash: 'dash', jump: 'jump', wall: 'wall', lens: 'lens' };
 
@@ -66,6 +67,8 @@ export class Game {
     // camera orbit state
     this.cameraYaw = Math.PI;
     this.cameraPitch = -0.12;
+    this.cameraMode = 'orbit';
+    this.cameraMode = 'orbit'; // 'orbit' | 'fps' | 'top'
 
     // UI
     this.hud = new HUD();
@@ -86,6 +89,7 @@ export class Game {
       onTitle: () => this.onCombatToTitle(),
     });
     this.holo = new HoloArena();
+    this.minimap = new Minimap(this);
     this.screens = new Screens({
       onStart: () => this.newGame(),
       onContinue: () => this.continueGame(),
@@ -680,6 +684,7 @@ export class Game {
     this.audio.init();
     this.audio.resume();
     this.mode = 'explore';
+    this.minimap.show();
     this.screens.hideTitle();
     this.screens.hidePause();
     this.screens.hideMap();
@@ -1255,6 +1260,7 @@ this.player.grounded = true;
       steps++;
     }
     this.renderer.render(this.scene, this.camera);
+    this.minimap.render();
   }
 
   update(dt) {
@@ -1298,7 +1304,8 @@ this.player.grounded = true;
       } else {
         this.player.update(dt * 1.0, this.input, this.cameraYaw, this.setupGateSolids());
       }
-      this.updateCamera(dt);
+      this.updateCamera(dt, input);
+      this.minimap.update(dt);
       this.updateInteractions();
       this.checkZones();
       this.checkTransitions();
@@ -1343,15 +1350,51 @@ this.player.grounded = true;
     return this.gateColliders;
   }
 
-  updateCamera(dt) {
+  updateCamera(dt, input) {
     const p = this.player;
-    // camera yaw/pitch from right joystick (touch) or Q/E (keyboard)
     const joyX = this.input.camJoyX;
     const joyY = this.input.camJoyY;
-    const keyCam = this.input.camHeld; // keyboard Q/E (-1/0/+1)
+    const keyCam = this.input.camHeld;
 
-    // yaw input is inverted so that E / right-stick-right turns the view right
-    // (verified: +yaw currently drifts the world to the right on screen)
+    // camera mode toggle: V key cycles orbit → fps → top
+    if (input.camMode) {
+      const modes = ['orbit', 'fps', 'top'];
+      const idx = modes.indexOf(this.cameraMode);
+      this.cameraMode = modes[(idx + 1) % modes.length];
+      this.hud.toast(`Камера: ${this.cameraMode === 'orbit' ? 'Обзор' : this.cameraMode === 'fps' ? 'От 1-го лица' : 'Вид сверху'}`);
+    }
+
+    if (this.cameraMode === 'fps') {
+      const yawRate = -(keyCam * 2.7 + joyX * 2.7);
+      if (yawRate !== 0) this.cameraYaw += yawRate * dt;
+      if (joyY !== 0) {
+        this.cameraPitch = Math.max(-1.2, Math.min(1.2, this.cameraPitch + joyY * 1.4 * dt));
+      }
+      p.mesh.rotation.y = this.cameraYaw;
+      const headY = p.pos.y + p.headHeight;
+      this.camera.position.set(p.pos.x, headY, p.pos.z);
+      const dir = new THREE.Vector3(
+        Math.sin(this.cameraYaw) * Math.cos(this.cameraPitch),
+        Math.sin(this.cameraPitch),
+        Math.cos(this.cameraYaw) * Math.cos(this.cameraPitch)
+      );
+      this.camera.lookAt(p.pos.x + dir.x, headY + dir.y, p.pos.z + dir.z);
+      return;
+    }
+
+    if (this.cameraMode === 'top') {
+      const dist = 28;
+      const targetX = p.pos.x;
+      const targetZ = p.pos.z;
+      const targetY = p.pos.y + dist;
+      this.camera.position.x += (targetX - this.camera.position.x) * Math.min(1, dt * 5);
+      this.camera.position.y += (targetY - this.camera.position.y) * Math.min(1, dt * 5);
+      this.camera.position.z += (targetZ - this.camera.position.z) * Math.min(1, dt * 5);
+      this.camera.lookAt(p.pos.x, p.pos.y, p.pos.z);
+      return;
+    }
+
+    // ORBIT (default)
     const yawRate = -(keyCam * 2.7 + joyX * 2.7);
     if (yawRate !== 0) this.cameraYaw += yawRate * dt;
 
@@ -1359,7 +1402,6 @@ this.player.grounded = true;
       this.cameraPitch = Math.max(-0.6, Math.min(0.9, this.cameraPitch + joyY * 1.4 * dt));
     }
 
-    // portrait: wider vertical view, pull camera back a little so streets read well
     const aspect = this.camera.aspect;
     const portrait = aspect < 1;
     const dist = portrait ? 11.5 : 9;
