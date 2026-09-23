@@ -1,4 +1,5 @@
 import { MapUI } from './MapUI.js';
+import { PERSONAS } from '../story/personas.js';
 
 export class Screens {
   constructor(hooks = {}) {
@@ -12,6 +13,9 @@ export class Screens {
 
     document.getElementById('btn-start').addEventListener('click', () => {
       this.hooks.onStart && this.hooks.onStart();
+    });
+    document.getElementById('btn-explore').addEventListener('click', () => {
+      this.hooks.onExploreStart && this.hooks.onExploreStart();
     });
     document.getElementById('btn-credits').addEventListener('click', () => this.showCredits());
     document.getElementById('btn-back-title').addEventListener('click', () => this.showTitle());
@@ -164,6 +168,8 @@ export class Screens {
     }
 
     this.mapUI = new MapUI(document.getElementById('map-canvas'), document.getElementById('map-legend'));
+    this.buildPersonaRow();
+    this.refreshPersona();
   }
 
   // показываем, какие движки реально доступны в этом окружении
@@ -221,7 +227,37 @@ export class Screens {
     });
   }
 
-  showTitle() { this.title.classList.remove('hidden'); this.credits.classList.add('hidden'); this.pause.classList.add('hidden'); this.settings.classList.add('hidden'); this.map.classList.add('hidden'); if (this._refreshSound) this._refreshSound(); if (this._refreshVoice) this._refreshVoice(); if (this._refreshTime) this._refreshTime(); this.refreshSave(); }
+  showTitle() { this.title.classList.remove('hidden'); this.credits.classList.add('hidden'); this.pause.classList.add('hidden'); this.settings.classList.add('hidden'); this.map.classList.add('hidden'); if (this._refreshSound) this._refreshSound(); if (this._refreshVoice) this._refreshVoice(); if (this._refreshTime) this._refreshTime(); this.refreshSave(); this.refreshPersona(); }
+
+  buildPersonaRow() {
+    const row = document.getElementById('persona-row');
+    if (!row || row.childElementCount) return;
+    for (const p of PERSONAS) {
+      const b = document.createElement('button');
+      b.className = 'persona-btn';
+      b.dataset.persona = p.id;
+      b.style.setProperty('--persona-hue', p.hue);
+      const name = document.createElement('span');
+      name.className = 'persona-name';
+      name.textContent = p.label;
+      const blurb = document.createElement('span');
+      blurb.className = 'persona-blurb';
+      blurb.textContent = p.blurb;
+      b.appendChild(name);
+      b.appendChild(blurb);
+      b.addEventListener('click', () => {
+        if (this.hooks.onPersonaSet) this.hooks.onPersonaSet(p);
+        this.refreshPersona(p.id);
+      });
+      row.appendChild(b);
+    }
+  }
+
+  refreshPersona(activeId) {
+    const id = activeId || (this.hooks.getPersona ? this.hooks.getPersona() : 'rook');
+    const btns = document.querySelectorAll('.persona-btn');
+    btns.forEach((b) => b.classList.toggle('active', b.dataset.persona === id));
+  }
   showCredits() { this.credits.classList.remove('hidden'); this.title.classList.remove('hidden'); }
   hideTitle() { this.title.classList.add('hidden'); }
   showPause() { this.pause.classList.remove('hidden'); this.settings.classList.add('hidden'); if (this._refreshTime) this._refreshTime(); this.refreshSave(); }

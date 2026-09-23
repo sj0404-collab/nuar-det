@@ -130,10 +130,10 @@ export class Minimap {
     }
 
     // vehicle
-    if (this.game.mount) {
-      const m = this.game.mount;
-      const px = cx + (m.pos.x - p.pos.x) * this.scale;
-      const pz = cy + (p.pos.z - m.pos.z) * this.scale;
+    if (this.game.mount && this.game.mount.veh) {
+      const m = this.game.mount.veh.mesh.position;
+      const px = cx + (m.x - p.pos.x) * this.scale;
+      const pz = cy + (p.pos.z - m.z) * this.scale;
       if (this.inCircle(px, pz)) {
         ctx.fillStyle = '#88cc88';
         ctx.beginPath(); ctx.arc(px, pz, 6, 0, Math.PI * 2); ctx.fill();

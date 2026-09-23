@@ -17,29 +17,30 @@ export class Input {
     this.camJoyX = 0;
     this.camJoyY = 0;
     this.camModePressed = false;
+    // какой источник ввода вышел последним: так кнопки и джойстик работают
+    // одновременно с клавиатурой на любом устройстве (мышь, тач-гибриды)
+    this.preferTouch = !!(this.touch && this.touch.isTouch);
 
     this.bind();
     if (this.touch) {
       this.touch.onMove = (x, y) => {
-        if (this.usingTouch) {
-          this.moveX = x;
-          this.moveZ = y;
-        }
+        this.preferTouch = true;
+        this.moveX = x;
+        this.moveZ = y;
       };
       this.touch.onCamJoy = (x, y) => {
-        if (this.usingTouch) {
-          this.camJoyX = x;
-          this.camJoyY = y;
-        }
+        this.preferTouch = true;
+        this.camJoyX = x;
+        this.camJoyY = y;
       };
       this.touch.onJump = (down) => {
-        if (this.usingTouch) {
-          this.jumpHeld = down;
-          if (down) this.jumpPressed = true;
-        }
+        this.preferTouch = true;
+        this.jumpHeld = down;
+        if (down) this.jumpPressed = true;
       };
       this.touch.onDash = (down) => {
-        if (this.usingTouch && down) this.dashPressed = true;
+        this.preferTouch = true;
+        if (down) this.dashPressed = true;
       };
     }
   }
@@ -57,6 +58,7 @@ export class Input {
     window.addEventListener('keydown', (e) => {
       if (e.repeat) return;
       const k = e.key.toLowerCase();
+      this.preferTouch = false;
       this.keys.add(k);
       this.pressed.add(k);
       if (k === ' ' || k === 'arrowup' || k === 'w') {
@@ -86,7 +88,7 @@ export class Input {
   }
 
   axis2D() {
-    if (this.usingTouch) return { x: this.moveX, z: this.moveZ };
+    if (this.preferTouch && this.touch) return { x: this.moveX, z: this.moveZ };
     let x = 0, z = 0;
     if (this.keys.has('d') || this.keys.has('arrowright') || this.keys.has('в')) x += 1;
     if (this.keys.has('a') || this.keys.has('arrowleft') || this.keys.has('ф')) x -= 1;

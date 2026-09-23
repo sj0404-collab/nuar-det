@@ -16,6 +16,7 @@ import { FINAL, ENDINGS } from './story/data.js';
 import { AudioSys } from './audio/AudioSys.js';
 import { VoiceEngine } from './audio/VoiceEngine.js';
 import { voiceFor } from './story/profiles.js';
+import { PERSONAS, loadPersona, savePersona, personaById } from './story/personas.js';
 import { makePainterlyMaterial, addInkOutline, flatGeometry } from './render/Painterly.js';
 import { buildAnimeEyes, buildAnimeHair, buildAnimeMouth, makeToon } from './render/AnimeFigure.js';
 import { Effects } from './render/Particles.js';
@@ -43,6 +44,9 @@ export class Game {
     this.clock = new THREE.Clock();
     this.audio = new AudioSys();
     this.voice = new VoiceEngine(this.audio);
+    // выбранный протагонист («от какого лица играть»)
+    this.persona = loadPersona();
+    this.exploreMode = false;
     // load voice settings
     const savedEngine = localStorage.getItem('nuar_voice_engine') || 'auto';
     const savedProfile = localStorage.getItem('nuar_voice_profile');
@@ -100,6 +104,7 @@ export class Game {
     this.tutorial = new Tutorial(this);
     this.screens = new Screens({
       onStart: () => this.newGame(),
+      onExploreStart: () => this.startExplore(),
       onContinue: () => this.continueGame(),
       onSave: () => { this.saveGame(); this.hud.toast('Игра сохранена.'); },
       onResume: () => this.resumeFromPause(),
@@ -122,6 +127,8 @@ export class Game {
       onRelayTest: () => this.testRelay(),
       onTimeSpeed: (mode) => this.setTimeMode(mode),
       getTimeMode: () => this.timeMode,
+      onPersonaSet: (p) => { this.setPersona(p); },
+      getPersona: () => this.persona.id,
       hasSave: () => this.hasSave(),
       saveInfo: () => this.saveInfoText(),
     });
@@ -739,6 +746,7 @@ export class Game {
     this.audio.init();
     this.audio.resume();
     this.mode = 'explore';
+    this.exploreMode = false;
     this.minimap.show();
     this.screens.hideTitle();
     this.screens.hidePause();
@@ -746,7 +754,7 @@ export class Game {
     this.screens.hideLoad();
     document.getElementById('screen-ending').classList.add('hidden');
     document.getElementById('hud').classList.remove('hidden');
-    if (this.touch.isTouch) this.touch.enable();
+    this.touch.enable();
     this.player.reset();
     this.player.pos.set(this.checkpoint.x, this.checkpoint.y, this.checkpoint.z);
     this.deck = [...STARTER_DECK];
@@ -758,9 +766,44 @@ export class Game {
     this.player.abilities.wall = false;
     this.player.abilities.lens = false;
     this.updateHud();
-    this.hud.toast('Дело №7: «Фонарь Моррова». Удачи, детектив.');
+    this.hud.toast('Дело №7: «Фонарь Моррова». Удачи, ' + this.persona.label + '.');
     this.hud.showHint('ПК: W/A/S/D — движение, Пробел — прыжок, F — взаимодействие. Мобилка: джойстик слева.', true);
     setTimeout(() => this.hud.hideHint(), 5000);
+  }
+
+  startExplore() {
+    this.audio.init();
+    this.audio.resume();
+    this.mode = 'explore';
+    this.exploreMode = true;
+    this.minimap.show();
+    this.screens.hideTitle();
+    this.screens.hidePause();
+    this.screens.hideMap();
+    this.screens.hideLoad();
+    document.getElementById('screen-ending').classList.add('hidden');
+    document.getElementById('hud').classList.remove('hidden');
+    this.touch.enable();
+    this.player.reset();
+    this.player.pos.set(this.checkpoint.x, this.checkpoint.y, this.checkpoint.z);
+    this.deck = [...STARTER_DECK];
+    this.flags = { explore: true };
+    this.seed = 'truth';
+    this.player.inventory.clear();
+    // режим исследования: город полностью открыт, все способности доступны
+    this.player.abilities.dash = true;
+    this.player.abilities.jump = true;
+    this.player.abilities.wall = true;
+    this.player.abilities.lens = true;
+    this.updateHud();
+    this.hud.setCase('Свободный город · ' + this.persona.label);
+    this.hud.toast('Режим исследования: город Ноктис открыт. Играйте за ' + this.persona.label + ' — всё разрешено.');
+    this.hud.showHint('Прыжок — дважды для двойного, Shift — рывок, F — общение. Пробуйте транспорт и все уголки города.', true);
+    setTimeout(() => this.hud.hideHint(), 6000);
+  }
+
+  setPersona(p) {
+    this.persona = savePersona(p);
   }
 
   toTitle() {
@@ -816,6 +859,7 @@ export class Game {
         taken: this.world.items.filter((it) => it.taken).map((it) => it.key || it.id),
         dead: this.wisps.filter((w) => w.dead).map((w) => w.zone + '#' + w.baseX + ',' + w.baseZ),
         bossDefeated: !!this.bossDefeated,
+        persona: this.persona ? this.persona.id : 'rook',
       };
       localStorage.setItem('nuar_save_v1', JSON.stringify(data));
       if (this.tutorial) this.tutorial.marksSwitches.save = true;
@@ -823,7 +867,7 @@ export class Game {
   }
 
   autosave() {
-    if (this.mode === 'title') return;
+    if (this.mode === 'title' || this.exploreMode) return;
     this.saveGame();
   }
 
@@ -840,6 +884,9 @@ export class Game {
       const d = JSON.parse(raw);
       this.checkpoint = d.checkpoint || { x: 0, y: 1.2, z: 22 };
       this.flags = d.flags || {};
+      if (d.persona && PERSONAS.some((p) => p.id === d.persona)) {
+        this.persona = personaById(d.persona);
+      }
       this.seed = d.seed || 'truth';
       this.deck = Array.isArray(d.deck) ? [...d.deck] : [...STARTER_DECK];
       if (d.state) {
@@ -930,7 +977,7 @@ export class Game {
       this.mode = 'explore';
       this.screens.hidePause();
       this.screens.hideMap();
-      if (this.touch && this.touch.isTouch) this.touch.enable();
+      this.touch.enable();
     }
   }
 
@@ -939,18 +986,19 @@ export class Game {
       this.mode = 'map';
       this.screens.showMap();
       this.screens.updateMap(this.world, this.player.pos, this.flags);
-      if (this.touch) this.touch.disable();
+      this.touch.disable();
     } else if (this.mode === 'map') {
       this.mode = 'explore';
       this.screens.hideMap();
-      if (this.touch) this.touch.enable();
+      this.touch.enable();
     }
   }
 
   updateHud() {
     this.hud.setLogs(this.buildLogs());
     this.hud.setAbilities(this.player.abilities);
-    this.hud.setCase('Дело №7 · Фонарь Моррова');
+    if (this.exploreMode) this.hud.setCase('Свободный город · ' + (this.persona ? this.persona.label : ''));
+    else this.hud.setCase('Дело №7 · Фонарь Моррова');
   }
 
   buildLogs() {
@@ -974,9 +1022,14 @@ export class Game {
 
   onDialogueChoose(i) {
     if (this.tutorial) this.tutorial.marksSwitches.dialogue = true;
+    const chosen = this.dialogue.choices[i];
     this.dialogue.choose(i);
     if (this.dialogue.active) {
       this.dialogueUI.render(this.dialogue);
+      // реплика, которую произносит игрок, — голосом выбранной персоны
+      if (chosen && this.voice && this.voice.enabled) {
+        this.voice.speak(chosen.label, this.persona ? this.persona.profile : null);
+      }
     } else {
       this.dialogueUI.close();
       this.mode = 'explore';
@@ -1197,16 +1250,20 @@ export class Game {
     );
 
     if (this.mount.driver && v.cab) {
-      // водитель: газ по axis2D, поворот по axis.x
+      // водитель: газ по axis2D, поворот по axis.x, с инерцией и коастингом
       const axis = this.input.axis2D();
       const throttle = -axis.z; // W (z=-1) — вперёд
-      v.speed += (throttle * 14 - v.speed) * Math.min(1, dt * 2.2);
-      if (Math.abs(axis.x) > 0.12 && Math.abs(v.speed) > 0.4) {
-        v.mesh.rotation.y += axis.x * dt * 1.3 * Math.sign(v.speed);
+      const target = throttle * 14;
+      // разгон плавный, торможение чуть резче; без газа — накат с трением
+      const k = target === 0 && Math.abs(v.speed) > 0.4 ? 0.8 : 2.2;
+      v.speed += (target - v.speed) * Math.min(1, dt * k);
+      if (Math.abs(v.speed) < 0.1 && target === 0) v.speed = 0;
+      if (Math.abs(axis.x) > 0.12 && Math.abs(v.speed) > 0.15) {
+        const turnGain = Math.min(2.4, 0.9 + Math.abs(v.speed) * 0.08);
+        v.mesh.rotation.y += axis.x * dt * turnGain * Math.sign(v.speed);
       }
       v.dir = v.speed >= 0 ? 1 : -1;
       v.playerDriven = true;
-      if (v.speed < 0.05) v.speed = 0;
       this.player.mesh.rotation.y = v.mesh.rotation.y;
       this.player.facing.set(Math.sin(v.mesh.rotation.y), 0, Math.cos(v.mesh.rotation.y));
     } else {
@@ -1442,6 +1499,7 @@ export class Game {
 
       // enemy wisps
       this.updateWisps(dt);
+      this.updateCrowd(dt, t);
 
       // boss trigger
       this.checkBossTrigger();
@@ -1624,6 +1682,43 @@ export class Game {
         if (tr.take) this.autosave();
         this.hud.toast(tr.take === 'down' ? 'Спуск в цистерну' : 'Подъём на рынок');
         return;
+      }
+    }
+  }
+
+  // толпа: прохожие осязаемы — тело мешает пройти, при контакте толчок,
+  // звук и короткая озвученная реплика («крик прохожего»)
+  updateCrowd(dt, t) {
+    if (this.mount || !this.world.peds) return;
+    const R2 = 0.75 * 0.75;
+    const p = this.player.pos;
+    if (this._crowdBumpCooldown) this._crowdBumpCooldown -= dt;
+    const phrases = ['Осторожнее!', 'Эй, смотри куда идёшь!', 'Куда прёшь-то?', 'Посторонись, любезный!', 'Ах!'];
+    for (const ped of this.world.peds) {
+      if (ped.activity !== null || !ped.fig || !ped.fig.g) continue;
+      const fx = ped.fig.g.position.x, fz = ped.fig.g.position.z;
+      const dx = p.x - fx, dz = p.z - fz;
+      const d2 = dx * dx + dz * dz;
+      if (d2 >= R2) { ped._bump = 0; continue; }
+      const dist = Math.sqrt(d2) || 0.01;
+      const nx = dx / dist, nz = dz / dist;
+      const overlap = 0.75 - dist;
+      // раздвигаем обоих: прохожий отползает, игрока слегка отталкивает
+      ped.fig.g.position.x -= nx * overlap * 0.55;
+      ped.fig.g.position.z -= nz * overlap * 0.55;
+      ped._bump = 0.3;
+      if (ped._bumpReached) continue; // уже в контакте, реакции не повторяем
+      ped._bumpReached = true;
+      this.audio.sfx('hit');
+      if (this._crowdBumpCooldown <= 0 && this.voice.enabled && !this.lensActive) {
+        this._crowdBumpCooldown = 2.5;
+        this.voice.speak(phrases[Math.floor(Math.random() * phrases.length)]);
+      }
+    }
+    for (const ped of this.world.peds) {
+      if (ped._bumpReached) {
+        if (!(ped._bump > 0)) ped._bumpReached = false;
+        if (ped._bump > 0) ped._bump -= dt;
       }
     }
   }
