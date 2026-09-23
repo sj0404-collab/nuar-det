@@ -840,36 +840,49 @@ export class Game {
     // chest
     for (const c of this.world.chests) {
       if (c.opened) continue;
-      const dx = p.x - c.pos.x, dz = p.z - c.pos.z;
-      if (dx * dx + dz * dz < 5 && Math.abs(p.y - c.pos.y) < 3.5) {
-        c.opened = true;
-        c.openT = 0;
-        c.animating = true;
-        this.effects.chestSparkle(new THREE.Vector3(c.pos.x, c.pos.y + 0.7, c.pos.z));
-        this.audio.sfx('chest');
-        let txt = `Сундук: ${c.label}.`;
-        for (const item of c.contents) {
-          if (item.kind === 'tome') {
-            const ab = { t_wall: 'wall', t_jump: 'jump', t_lens: 'lens' }[item.id];
-            if (ab) this.grantAbility(ab);
-            txt += ` Том: ${item.label}.`;
-          } else if (item.kind === 'key') {
-            this.player.inventory.add(item.id);
-            txt += ` Ключ: ${item.label}.`;
-            this.checkGatesAuto();
-          } else if (item.kind === 'card') {
-            if (CARDS[item.id]) this.deck.push(item.id);
-            txt += ` Карта: ${CARDS[item.id] ? CARDS[item.id].name : item.id}.`;
-          }
+      if (!this.chestReach(c, p)) continue;
+      c.opened = true;
+      c.openT = 0;
+      c.animating = true;
+      this.effects.chestSparkle(new THREE.Vector3(c.pos.x, c.pos.y + 0.7, c.pos.z));
+      this.audio.sfx('chest');
+      let txt = `Сундук: ${c.label}.`;
+      for (const item of c.contents) {
+        if (item.kind === 'tome') {
+          const ab = { t_wall: 'wall', t_jump: 'jump', t_lens: 'lens' }[item.id];
+          if (ab) this.grantAbility(ab);
+          txt += ` Том: ${item.label}.`;
+        } else if (item.kind === 'key') {
+          this.player.inventory.add(item.id);
+          txt += ` Ключ: ${item.label}.`;
+          this.checkGatesAuto();
+        } else if (item.kind === 'card') {
+          if (CARDS[item.id]) this.deck.push(item.id);
+          txt += ` Карта: ${CARDS[item.id] ? CARDS[item.id].name : item.id}.`;
         }
-        this.hud.toast(txt);
-        this.updateHud();
+      }
+      this.hud.toast(txt);
+      this.updateHud();
+      return;
+    }
+    // near an unreachable chest? tell the player why the press did nothing
+    for (const c of this.world.chests) {
+      if (c.opened) continue;
+      const dx = p.x - c.pos.x, dz = p.z - c.pos.z;
+      if (dx * dx + dz * dz < 64) {
+        if (p.y < c.pos.y - 3.5) this.hud.toast('Сундук выше — заберитесь наверх.');
+        else this.hud.toast('Подойдите к сундуку ближе.');
         return;
       }
     }
     // transport
     const v = this.findVehicleNear();
     if (v) { this.board(v); }
+  }
+
+  chestReach(c, p) {
+    const dx = p.x - c.pos.x, dz = p.z - c.pos.z;
+    return dx * dx + dz * dz < 36 && Math.abs(p.y - c.pos.y) < 4;
   }
 
   // ---------------- riding / transport ----------------
@@ -1159,8 +1172,9 @@ this.player.grounded = true;
       if (!near) {
         for (const c of this.world.chests) {
           if (c.opened) continue;
-          const dx = p.x - c.pos.x, dz = p.z - c.pos.z;
-          if (dx * dx + dz * dz < 6) { near = { text: `Сундук — F`, interact: true }; break; }
+          if (!this.chestReach(c, p)) continue;
+          near = { text: `Сундук — F`, interact: true };
+          break;
         }
       }
       if (!near && this.findVehicleNear()) {
