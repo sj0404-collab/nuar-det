@@ -51,6 +51,18 @@ export class Screens {
       });
       this._refreshSound = refreshSound;
     }
+    const voiceBtn = document.getElementById('btn-voice-toggle');
+    if (voiceBtn) {
+      const refreshVoice = () => {
+        const on = this.hooks.getVoiceEnabled ? this.hooks.getVoiceEnabled() : true;
+        voiceBtn.textContent = 'Озвучка: ' + (on ? 'вкл' : 'выкл');
+      };
+      voiceBtn.addEventListener('click', () => {
+        this.hooks.onToggleVoice && this.hooks.onToggleVoice();
+        refreshVoice();
+      });
+      this._refreshVoice = refreshVoice;
+    }
     const settingsSens = document.getElementById('settings-cam-sens-slider');
     if (settingsSens) {
       settingsSens.value = parseFloat(localStorage.getItem('nuar_cam_sens')) || 1.0;
@@ -92,7 +104,7 @@ export class Screens {
     this.mapUI = new MapUI(document.getElementById('map-canvas'), document.getElementById('map-legend'));
   }
 
-  showTitle() { this.title.classList.remove('hidden'); this.credits.classList.add('hidden'); this.pause.classList.add('hidden'); this.settings.classList.add('hidden'); this.map.classList.add('hidden'); if (this._refreshSound) this._refreshSound(); if (this._refreshTime) this._refreshTime(); }
+  showTitle() { this.title.classList.remove('hidden'); this.credits.classList.add('hidden'); this.pause.classList.add('hidden'); this.settings.classList.add('hidden'); this.map.classList.add('hidden'); if (this._refreshSound) this._refreshSound(); if (this._refreshVoice) this._refreshVoice(); if (this._refreshTime) this._refreshTime(); }
   showCredits() { this.credits.classList.remove('hidden'); this.title.classList.remove('hidden'); }
   hideTitle() { this.title.classList.add('hidden'); }
   showPause() { this.pause.classList.remove('hidden'); this.settings.classList.add('hidden'); if (this._refreshTime) this._refreshTime(); }
@@ -105,6 +117,7 @@ export class Screens {
     const invertBtn = document.getElementById('btn-invert-joy');
     if (invertBtn) invertBtn.textContent = 'Инверсия джойстика: ' + (localStorage.getItem('nuar_invert_joy') === '1' ? 'вкл' : 'выкл');
     if (this._refreshSound) this._refreshSound();
+    if (this._refreshVoice) this._refreshVoice();
     if (this._refreshTime) this._refreshTime();
   }
   hideSettings() { this.settings.classList.add('hidden'); }

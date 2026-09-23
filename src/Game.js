@@ -14,6 +14,8 @@ import { Combat } from './cards/Combat.js';
 import { CARDS, STARTER_DECK, ENCOUNTERS, ENEMIES } from './cards/data.js';
 import { FINAL, ENDINGS } from './story/data.js';
 import { AudioSys } from './audio/AudioSys.js';
+import { VoiceEngine } from './audio/VoiceEngine.js';
+import { voiceFor } from './story/profiles.js';
 import { makePainterlyMaterial, addInkOutline, flatGeometry } from './render/Painterly.js';
 import { buildAnimeEyes, buildAnimeHair, buildAnimeMouth, makeToon } from './render/AnimeFigure.js';
 import { Effects } from './render/Particles.js';
@@ -37,6 +39,7 @@ export class Game {
 
     this.clock = new THREE.Clock();
     this.audio = new AudioSys();
+    this.voice = new VoiceEngine(this.audio);
     // суточный цикл привязан к реальному дню устройства (24 реальных часа)
     this.timeCycle = new TimeCycle();
     this.timeMode = localStorage.getItem('nuar_time_mode') || 'device'; // device | pause
@@ -71,6 +74,7 @@ export class Game {
     this.dialogueUI = new DialogueUI({
       onChoose: (i) => this.onDialogueChoose(i),
       onSound: (s) => this.audio.sfx(s),
+      onSpeak: (d) => this.onDialogueSpeak(d),
     });
     this.combatUI = new CombatUI({
       onPlay: (i) => this.onCombatPlay(i),
@@ -87,6 +91,8 @@ export class Game {
       onInvertJoy: (val) => this.touch.setInvertJoy(val),
       onToggleSound: () => this.toggleSound(),
       getSoundMuted: () => this.audio.muted,
+      onToggleVoice: () => this.toggleVoice(),
+      getVoiceEnabled: () => this.voice.enabled,
       onTimeSpeed: (mode) => this.setTimeMode(mode),
       getTimeMode: () => this.timeMode,
     });
@@ -673,6 +679,12 @@ export class Game {
     this.audio.toggleMute();
   }
 
+  toggleVoice() {
+    const on = this.voice.toggle();
+    if (!on) this.voice.stop();
+    this.hud.toast(on ? 'Озвучка реплик: вкл' : 'Озвучка реплик: выкл');
+  }
+
   setTimeMode(mode) {
     this.timeMode = mode;
     localStorage.setItem('nuar_time_mode', mode);
@@ -749,7 +761,13 @@ export class Game {
       this.dialogueUI.close();
       this.mode = 'explore';
       this.audio.sfx('dialogue');
+      this.voice.stop();
     }
+  }
+
+  onDialogueSpeak(d) {
+    if (!d || !d.text) return;
+    this.voice.speak(d.text, voiceFor(d.speaker));
   }
 
   closeDialogue() {}
@@ -919,6 +937,7 @@ export class Game {
       this.dialogueUI.speaker.textContent = FINAL.speaker;
       this.dialogueUI.text.textContent = FINAL.text;
       this.dialogueUI.choices.innerHTML = '';
+      this.onDialogueSpeak(FINAL);
       FINAL.choices.forEach((c, i) => {
         const btn = document.createElement('button');
         btn.className = 'dlg-choice';
@@ -936,6 +955,7 @@ export class Game {
   showEnding(ending) {
     const e = ENDINGS[ending] || ENDINGS.truth;
     this.mode = 'ending';
+    this.voice.stop();
     document.getElementById('ending-title').textContent = e.title;
     document.getElementById('ending-text').textContent = e.text;
     document.getElementById('screen-ending').classList.remove('hidden');

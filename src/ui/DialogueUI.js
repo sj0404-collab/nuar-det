@@ -36,6 +36,7 @@ export class DialogueUI {
       });
     }
     if (this.hooks.onSound) this.hooks.onSound('dialogue');
+    if (this.hooks.onSpeak && d.text) this.hooks.onSpeak(d);
   }
 
   renderNow() {
