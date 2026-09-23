@@ -123,6 +123,7 @@ export class Game {
     this.buildChests();
     this.buildNpcs();
     this.buildCitizens();
+    this.buildEasterEggs();
     this.buildEnemies();
     this.initPanelListeners();
 
@@ -347,6 +348,36 @@ export class Game {
 
   buildCitizens() {
     buildPedestrians(this.world);
+  }
+
+  // noir easter eggs: cinema-sign boards + postcards speckled through the city
+  buildEasterEggs() {
+    const boardMat = new THREE.MeshBasicMaterial({
+      color: 0x14181c, transparent: true, opacity: 0.82, side: THREE.DoubleSide,
+    });
+    const addSign = (text, x, y, z, size, color, bw, bh) => {
+      if (bw) {
+        const b = new THREE.Mesh(new THREE.PlaneGeometry(bw, bh), boardMat);
+        b.position.set(x, y, z);
+        this.scene.add(b);
+      }
+      const s = this.makeTextSprite(text, size, color);
+      s.position.set(x, y, z + 0.18);
+      s.scale.set(s.scale.x * 1.15, s.scale.y * 1.15, 1);
+      this.scene.add(s);
+    };
+    // The Maltese Falcon — glowing marquee over the market hall
+    addSign('МАЛЬТИЙСКИЙ СОКОЛ · СЕАНС 19:30', 112, 8.6, -43.1, 46, '#e9c46a', 30, 2.4);
+    // Casablanca bar
+    addSign('БАР «СЫГРАЙТЕ ЕЩЁ, СЭМ»', 32, 6.2, 4.3, 40, '#ffd98a', 16, 2.0);
+    // Blade Runner nod, harbor lane
+    addSign('ЧЁРНЫЙ ЛОТОС', 210, 6.2, 116, 44, '#ffb3e0', 10, 1.9);
+    // Wanted poster by the harbormaster
+    addSign('РАЗЫСКИВАЕТСЯ: ФОНАРЬ', 228, 2.4, 112, 30, '#e9dcc0', 9, 1.5);
+    // graffiti nod to the constable
+    addSign('ГРАЧ ЗДЕСЬ БЫЛ · СЮДА ПРИДУТ', 10, 1.7, 4, 24, '#aac7d8', 7, 1.2);
+    // The Third Man plaque above the cistern drain
+    addSign('ТРЕТИЙ ЧЕЛОВЕК · ДО КЛЮЧА — 3 ЧАСА', 138, 2.8, 10, 24, '#aac7d8', 8, 1.4);
   }
 
   buildLowPolyFigure(n) {

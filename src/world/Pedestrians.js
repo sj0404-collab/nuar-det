@@ -204,6 +204,30 @@ export function buildPedestrians(world) {
   }
   peds.push({ fig: fish, activity: 'fish', phase: Math.random() * 6.28, speed: 0, wp: null, pause: 0, pauseT: 0, i: 0, dir: 1 });
   props.fish = fish;
+
+  // 5) sleeping cat on the market crates (a nod to The Big Sleep)
+  const catMat = makePainterlyMaterial(0x5a5560, { rimStrength: 0.5 });
+  const cat = new THREE.Group();
+  const cbody = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.16, 0.26), catMat);
+  cbody.position.y = 0.09;
+  cat.add(cbody);
+  const chead = new THREE.Mesh(flatGeometry(new THREE.SphereGeometry(0.1, 6, 4)), catMat);
+  chead.position.set(0.15, 0.12, 0.05);
+  cat.add(chead);
+  for (const s of [-1, 1]) {
+    const ear = new THREE.Mesh(new THREE.ConeGeometry(0.035, 0.09, 4), catMat);
+    ear.position.set(0.15 + s * 0.045, 0.22, 0.05);
+    cat.add(ear);
+  }
+  const ctail = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.42, 4), makePainterlyMaterial(0x47424d));
+  ctail.position.set(-0.26, 0.14, -0.06);
+  ctail.rotation.z = 0.9;
+  cat.add(ctail);
+  cat.userData.tail = ctail;
+  cat.position.set(117.7, 0.56, -9.7);
+  cat.rotation.y = -2.2;
+  world.scene.add(cat);
+  props.cat = cat;
   const gullMat = makePainterlyMaterial(0xe8e6da, { rimStrength: 0.4 });
   for (let i = 0; i < 3; i++) {
     const gl = new THREE.Group();
@@ -314,5 +338,13 @@ export function updatePedestrians(peds, props, dt, t) {
     glide.g.rotation.y = -a + Math.PI / 2;
     const flap = Math.sin(t * 6 + glide.phase) * 0.5;
     for (const w of glide.wings) w.rotation.z = flap;
+  }
+
+  // sleeping market cat — soft breathing + slow tail flick
+  if (props && props.cat) {
+    const breathe = 1 + Math.sin(t * 2.3) * 0.02;
+    props.cat.scale.set(2 - breathe, breathe * 0.96, 1);
+    const tail = props.cat.userData.tail;
+    if (tail) tail.rotation.z = 0.9 + Math.sin(t * 1.1) * 0.18;
   }
 }
