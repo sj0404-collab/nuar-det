@@ -17,6 +17,10 @@ export class Input {
     this.camJoyX = 0;
     this.camJoyY = 0;
     this.camModePressed = false;
+    this.camModeSet = null;
+    this.inventoryPressed = false;
+    this.camModeSet = null;
+    this.inventoryPressed = false;
     // какой источник ввода вышел последним: так кнопки и джойстик работают
     // одновременно с клавиатурой на любом устройстве (мышь, тач-гибриды)
     this.preferTouch = !!(this.touch && this.touch.isTouch);
@@ -76,6 +80,10 @@ export class Input {
       if (k === 'escape' || k === 'p' || k === 'з') { this.pausePressed = true; }
       if (k === 'c') { this.deckPressed = true; }
       if (k === 'v') { this.camModePressed = true; }
+      if (k === '1') { this.camModeSet = 'orbit'; }
+      if (k === '2') { this.camModeSet = 'top'; }
+      if (k === '3') { this.camModeSet = 'fps'; }
+      if (k === 'i' || k === 'ш') { this.inventoryPressed = true; }
     });
     window.addEventListener('keyup', (e) => {
       const k = e.key.toLowerCase();
@@ -113,6 +121,8 @@ export class Input {
       pause: this.pausePressed,
       deck: this.deckPressed,
       camMode: this.camModePressed,
+      camModeSet: this.camModeSet,
+      inventory: this.inventoryPressed,
       jumpSpace: this.jumpSpace,
     };
     this._jump = out.jump;
@@ -126,6 +136,8 @@ export class Input {
     this.pausePressed = false;
     this.deckPressed = false;
     this.camModePressed = false;
+    this.camModeSet = null;
+    this.inventoryPressed = false;
     this.pressed.clear();
     return out;
   }

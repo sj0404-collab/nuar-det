@@ -101,17 +101,30 @@ const WALKS = [
   { path: [{ x: 15, z: 34 }, { x: 15, z: -18 }], speed: 1.5 },
 ];
 
+
+// каждый прохожий — со своим ростом, весом и головой (аниме-пропорции),
+// плюс ему назначаются биометрия для анимаций
+function applyCitizenBody(fig, r = Math.random) {
+  const height = 0.86 + r() * 0.3;          // 0.86 .. 1.16
+  const build = 0.82 + r() * 0.38;          // 0.82 .. 1.20
+  const head = 1.0 + (1.05 - height) * 0.55 + (r() - 0.5) * 0.08;
+  fig.g.scale.set(build, height, build);
+  if (fig.headG) fig.headG.scale.setScalar(head);
+  return { height, build, head, gait: 2.6 + r() * 1.6, idle: r() * 6.28 };
+}
+
 export function buildPedestrians(world) {
   const peds = [];
   for (const w of WALKS) {
     const fig = citizenFigure({ cat: 'walk' });
     const p = w.path[0];
     fig.g.position.set(p.x, 0, p.z);
+    const body = applyCitizenBody(fig);
     world.scene.add(fig.g);
     peds.push({
-      fig, wp: w.path, i: 0, dir: 1, speed: w.speed,
+      fig, wp: w.path, i: 0, dir: 1, speed: w.speed * (0.88 + body.height * 0.14),
       pause: Math.random() * 2.2, pauseT: 0, phase: Math.random() * 6.28,
-      activity: null,
+      activity: null, body, glance: 0, glanceCd: 1 + Math.random() * 4,
     });
   }
 
@@ -249,7 +262,7 @@ export function buildPedestrians(world) {
   world.pedsProps = props;
 }
 
-export function updatePedestrians(peds, props, dt, t) {
+export function updatePedestrians(peds, props, dt, t, playerPos = null) {
   for (const p of peds || []) {
     const fig = p.fig;
 
@@ -279,12 +292,38 @@ export function updatePedestrians(peds, props, dt, t) {
           else if (p.i >= len - 1) { p.dir = -1; p.pauseT = 0.6 + Math.random() * 2.2; }
         }
       }
-      fig.legL.rotation.x = moving ? Math.sin(p.phase) * 0.55 : Math.sin(t * 2 + p.phase) * 0.06;
-      fig.legR.rotation.x = moving ? -Math.sin(p.phase) * 0.55 : -Math.sin(t * 2 + p.phase) * 0.06;
+      // своя походка: длина шага и частота зависят от телосложения
+      const gait = p.body ? p.body.gait : 3.2;
+      const stride = 0.5 + (p.body ? (p.body.height - 0.86) * 0.35 : 0.1);
+      fig.legL.rotation.x = moving ? Math.sin(p.phase) * stride : Math.sin(t * 2 + p.phase) * 0.06;
+      fig.legR.rotation.x = moving ? -Math.sin(p.phase) * stride : -Math.sin(t * 2 + p.phase) * 0.06;
       fig.armL.rotation.x = moving ? -Math.sin(p.phase) * 0.5 : Math.sin(t * 1.5 + p.phase) * 0.08;
-      fig.armR.rotation.x = moving ? Math.sin(p.phase) * 0.5 : -Math.sin(t * 1.5 + p.phase) * 0.08;
-      fig.g.position.y = moving ? Math.abs(Math.sin(p.phase)) * 0.04 : Math.sin(t * 1.3 + p.phase) * 0.015;
-      continue;
+      fig.armR.rotation.x = moving ? Math.sin(p.phase) * 0.5 : Math.sin(t * 1.5 + p.phase) * 0.08;
+      fig.g.position.y = moving ? Math.abs(Math.sin(p.phase * gait / 3.2)) * 0.04 : Math.sin(t * 1.3 + p.phase) * 0.015;
+      // живой прохожий: смотрит на игрока, если тот рядом, и поворачивает голову
+      if (playerPos) {
+        const ddx = playerPos.x - fig.g.position.x;
+        const ddz = playerPos.z - fig.g.position.z;
+        if (ddx * ddx + ddz * ddz < 36) {
+          p.glanceCd -= dt;
+          if (p.glance <= 0 && p.glanceCd <= 0) {
+            p.glance = 1.2 + Math.random() * 1.6;
+            p.glanceCd = 5 + Math.random() * 9;
+          }
+        }
+      }
+      if (p.glance > 0) {
+        p.glance -= dt;
+        const look = playerPos ? Math.atan2(playerPos.x - fig.g.position.x, playerPos.z - fig.g.position.z) : fig.g.rotation.y;
+        let rel = look - fig.g.rotation.y;
+        while (rel > Math.PI) rel -= Math.PI * 2;
+        while (rel < -Math.PI) rel += Math.PI * 2;
+        const lookAmt = Math.max(-0.9, Math.min(0.9, rel));
+        fig.headG.rotation.y = lookAmt * 0.8;
+        fig.g.rotation.y += lookAmt * 0.1 * Math.min(1, dt * 3);
+      } else if (fig.headG) {
+        fig.headG.rotation.y *= Math.max(0, 1 - dt * 4);
+      }
     }
 
     // ---------- activity figures ----------

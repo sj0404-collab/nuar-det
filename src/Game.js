@@ -71,6 +71,7 @@ export class Game {
     this.glow.build(this.world);
 
     this.player = new Player(this.scene, this.effects, (s) => this.audio.sfx(s));
+    this.player.applyBody(this.persona ? this.persona.body : null);
     const coll = this.world.getColliders();
     this.player.setColliders(coll.solids, coll.oneWays);
 
@@ -110,6 +111,9 @@ export class Game {
       onResume: () => this.resumeFromPause(),
       onPause: () => this.togglePause(),
       onMap: () => this.toggleMap(),
+      onInventory: () => this.toggleInventory(),
+      onCameraMode: (mode) => this.setCameraMode(mode),
+      getInventory: () => this.inventoryData(),
       onToTitle: () => this.toTitle(),
       onCamSens: (val) => this.touch.setCamSensitivity(val),
       onInvertJoy: (val) => this.touch.setInvertJoy(val),
@@ -133,6 +137,7 @@ export class Game {
       saveInfo: () => this.saveInfoText(),
     });
     this.screens.showTitle();
+    this.screens.setCameraMode(this.cameraMode);
 
     // state
     this.mode = 'title';
@@ -364,10 +369,35 @@ export class Game {
     }
   }
 
+  // стабильная «биометрия» персонажа: одно и то же при каждом запуске
+  npcBodySpec(n) {
+    if (n.body) return n.body;
+    let h = 2166136261;
+    const key = String(n.id || n.name || 'npc');
+    for (let i = 0; i < key.length; i++) {
+      h ^= key.charCodeAt(i);
+      h = Math.imul(h, 16777619);
+    }
+    const r = (salt) => {
+      h ^= salt + 0x9e3779b9;
+      h = Math.imul(h, 16777619);
+      return ((h >>> 0) % 1000) / 1000;
+    };
+    const height = 0.88 + r(1) * 0.28;
+    const build = 0.84 + r(2) * 0.34;
+    const head = 1.0 + (1.02 - height) * 0.5 + (r(3) - 0.5) * 0.1;
+    return { height, build, head };
+  }
+
   buildNpcs() {
     for (const n of this.world.npcs) {
       // faceted low-poly 3D figure so characters read in the world
       const figure = this.buildLowPolyFigure(n);
+      // у каждого NPC своя аниме-пропорция: рост, вес, голова
+      const body = this.npcBodySpec(n);
+      figure.scale.set(body.build, body.height, body.build);
+      if (n.headG) n.headG.scale.setScalar(body.head);
+      n.body = body;
       figure.position.set(n.pos.x, n.pos.y + 0.1, n.pos.z);
       figure.rotation.y = Math.atan2(-this.checkpoint.x + n.pos.x, -this.checkpoint.z + n.pos.z) || 0;
       this.scene.add(figure);
@@ -804,6 +834,7 @@ export class Game {
 
   setPersona(p) {
     this.persona = savePersona(p);
+    if (this.player && p.body) this.player.applyBody(p.body);
   }
 
   toTitle() {
@@ -886,6 +917,7 @@ export class Game {
       this.flags = d.flags || {};
       if (d.persona && PERSONAS.some((p) => p.id === d.persona)) {
         this.persona = personaById(d.persona);
+        this.player.applyBody(this.persona.body);
       }
       this.seed = d.seed || 'truth';
       this.deck = Array.isArray(d.deck) ? [...d.deck] : [...STARTER_DECK];
@@ -973,10 +1005,11 @@ export class Game {
   }
 
   resumeFromPause() {
-    if (this.mode === 'pause' || this.mode === 'map') {
+    if (this.mode === 'pause' || this.mode === 'map' || this.mode === 'inventory') {
       this.mode = 'explore';
       this.screens.hidePause();
       this.screens.hideMap();
+      this.screens.hideInventory();
       this.touch.enable();
     }
   }
@@ -992,6 +1025,55 @@ export class Game {
       this.screens.hideMap();
       this.touch.enable();
     }
+  }
+
+  toggleInventory() {
+    if (this.mode === 'explore' || this.mode === 'pause') {
+      this.mode = 'inventory';
+      this.screens.showPause();
+      this.screens.showInventory();
+      this.screens.showInvTab('deck');
+      this.touch.disable();
+    } else if (this.mode === 'inventory') {
+      this.mode = 'explore';
+      this.screens.hideInventory();
+      this.screens.hidePause();
+      this.touch.enable();
+    }
+  }
+
+  setCameraMode(mode) {
+    if (!['orbit', 'top', 'fps'].includes(mode)) return;
+    this.cameraMode = mode;
+    localStorage.setItem('nuar_cam_mode', mode);
+    this.screens.setCameraMode(mode);
+    const names = { orbit: 'сбоку (обзор)', top: 'сверху', fps: 'от первого лица' };
+    this.hud.toast('Камера: ' + names[mode]);
+  }
+
+  inventoryData() {
+    const deck = this.deck.map((id) => CARDS[id]).filter(Boolean).map((c) => ({
+      name: c.name, kind: c.kind, art: c.art, desc: c.desc, cost: c.cost,
+    }));
+    const clues = [];
+    const used = new Set();
+    for (const it of this.world.items) {
+      if (!it.taken) continue;
+      if (it.key && !this.player.inventory.has(it.key)) continue;
+      if (it.key) used.add(it.key);
+      clues.push({ icon: it.icon || '✦', name: it.label, meta: 'улика', desc: it.room ? 'Найдено в Ноктисе' : '' });
+    }
+    for (const key of this.player.inventory) {
+      if (used.has(key)) continue;
+      clues.push({ icon: '🗝', name: key, meta: 'улика', desc: '' });
+    }
+    const tools = [];
+    const ab = this.player.abilities;
+    if (ab.dash) tools.push({ icon: '➤', name: 'Дымополёт', meta: 'рывок', desc: 'Рывок вперёд (Shift)' });
+    if (ab.jump) tools.push({ icon: '✦', name: 'Двоение тени', meta: 'способность', desc: 'Двойной прыжок в воздухе' });
+    if (ab.wall) tools.push({ icon: '🕸', name: 'Свод теней', meta: 'способность', desc: 'Выход на стены и потолки' });
+    if (ab.lens) tools.push({ icon: '🔍', name: 'Зрение личины', meta: 'способность', desc: 'Следы и улики светятся (L)' });
+    return { deck, clues, tools };
   }
 
   updateHud() {
@@ -1482,6 +1564,7 @@ export class Game {
         this.world.items.forEach((it) => { if (!it.taken) it.halo.material.opacity = this.lensActive ? 0.95 : 0.65; });
       }
       if (input.interact) this.tryInteract();
+      if (input.inventory) this.toggleInventory();
 
       if (this.mount && input.jumpSpace) this.dismount(true);
 
@@ -1507,6 +1590,9 @@ export class Game {
       this.input.consume();
     } else if (this.mode === 'map') {
       if (input.map || input.pause) this.toggleMap();
+    } else if (this.mode === 'inventory') {
+      if (input.map || input.pause || input.inventory) this.toggleInventory();
+      this.input.consume();
     } else if (this.mode === 'pause') {
       if (input.pause) { this.resumeFromPause(); }
       this.input.consume();
@@ -1544,13 +1630,15 @@ export class Game {
     const joyY = this.input.camJoyY;
     const keyCam = this.input.camHeld;
 
-    // camera mode toggle: V key cycles orbit → fps → top
+    // camera mode: V cycles, 1/2/3 and HUD buttons pick a specific view
+    if (input.camModeSet) {
+      this.setCameraMode(input.camModeSet);
+      if (this.tutorial) this.tutorial.marksSwitches.camera = true;
+    }
     if (input.camMode) {
       const modes = ['orbit', 'fps', 'top'];
       const idx = modes.indexOf(this.cameraMode);
-      this.cameraMode = modes[(idx + 1) % modes.length];
-      localStorage.setItem('nuar_cam_mode', this.cameraMode);
-      this.hud.toast(`Камера: ${this.cameraMode === 'orbit' ? 'Обзор' : this.cameraMode === 'fps' ? 'От 1-го лица' : 'Вид сверху'}`);
+      this.setCameraMode(modes[(idx + 1) % modes.length]);
       if (this.tutorial) this.tutorial.marksSwitches.camera = true;
     }
 
@@ -1779,7 +1867,7 @@ export class Game {
   animateProps(dt) {
     const t = this.clock.elapsedTime;
     this.world.updateTraffic(dt, t);
-    updatePedestrians(this.world.peds, this.world.pedsProps, dt, t);
+    updatePedestrians(this.world.peds, this.world.pedsProps, dt, t, this.player.pos);
     for (const it of this.world.items) {
       if (it.taken) continue;
       it.mesh.position.y = it.pos.y + Math.sin(t * 2 + it.pos.x) * 0.18;
@@ -1823,8 +1911,21 @@ export class Game {
       if (n.armR) n.armR.rotation.z = -0.08 - Math.sin(t * 1.2 + n.bobPhase) * 0.06;
       if (n.armL) n.armL.rotation.x = Math.sin(t * 0.9 + n.bobPhase) * 0.05;
       if (n.armR) n.armR.rotation.x = -Math.sin(t * 0.9 + n.bobPhase) * 0.05;
-      if (n.headG) n.headG.rotation.z = Math.sin(t * 0.7 + n.bobPhase) * 0.03;
-      if (n.headG) n.headG.rotation.y = Math.sin(t * 0.5 + n.bobPhase) * 0.08;
+      // оживший NPC: следит за игроком, когда тот подходит, и кивает
+      const pdx = this.player.pos.x - n.pos.x;
+      const pdz = this.player.pos.z - n.pos.z;
+      const near = pdx * pdx + pdz * pdz < 36;
+      if (near) {
+        const want = Math.atan2(pdx, pdz);
+        let rel = want - n.figure.rotation.y;
+        while (rel > Math.PI) rel -= Math.PI * 2;
+        while (rel < -Math.PI) rel += Math.PI * 2;
+        n.figure.rotation.y += Math.max(-1, Math.min(1, rel)) * Math.min(1, dt * 3);
+        n.headG.rotation.y = Math.max(-0.6, Math.min(0.6, rel)) * 0.7;
+        n.headG.rotation.z = Math.sin(t * 3 + n.bobPhase) * 0.02;
+      } else {
+        if (n.headG) n.headG.rotation.y = Math.sin(t * 0.5 + n.bobPhase) * 0.08;
+      }
       n.figure.rotation.x = 0.08 + breathe;
       n.figure.rotation.z = Math.sin(t * 1.1 + n.bobPhase) * 0.015;
     }

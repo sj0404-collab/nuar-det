@@ -35,6 +35,12 @@
           <div id="logs"></div>
           <div id="abilities"></div>
           <div id="right-panel">
+            <div id="cam-switch">
+              <button id="btn-cam-side" class="icon-btn cam-btn" aria-label="Вид сбоку">Сбоку</button>
+              <button id="btn-cam-top" class="icon-btn cam-btn" aria-label="Вид сверху">Сверху</button>
+              <button id="btn-cam-fps" class="icon-btn cam-btn" aria-label="От первого лица">От 1-го</button>
+            </div>
+            <button id="btn-inventory" class="icon-btn" aria-label="Колода и улики">Колода</button>
             <button id="btn-map" class="icon-btn" aria-label="Карта">🗺</button>
             <button id="btn-menu" class="icon-btn" aria-label="Меню">≡</button>
           </div>
@@ -190,6 +196,19 @@
         <canvas id="map-canvas" width="560" height="420"></canvas>
         <div id="map-legend"></div>
         <button id="btn-map-close" class="menu-btn">Закрыть</button>
+      </div>
+    </div>
+
+    <div id="screen-inventory" class="screen hidden">
+      <div class="inv-wrap">
+        <h2>Колода и улики</h2>
+        <div id="inv-tabs">
+          <button id="btn-tab-deck" class="inv-tab active">Колода</button>
+          <button id="btn-tab-clues" class="inv-tab">Улики и инструменты</button>
+        </div>
+        <div id="inv-deck" class="inv-panel"></div>
+        <div id="inv-clues" class="inv-panel hidden"></div>
+        <button id="btn-inv-close" class="menu-btn">Закрыть</button>
       </div>
     </div>
 

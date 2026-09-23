@@ -52,6 +52,11 @@ export class Player {
 
   buildMesh(scene) {
     const g = new THREE.Group();
+    // внутренняя группа тела: сюда applyBody() тянет рост/вес персоны,
+    // не задевая squash-stretch анимации на this.mesh
+    const bodyG = new THREE.Group();
+    g.add(bodyG);
+    this.body = bodyG;
 
     const coatMat = makeToon(0x2b3542, { rimStrength: 0.65 });
     const darkMat = makeToon(0x1c2129, { rimStrength: 0.4 });
@@ -75,21 +80,21 @@ export class Player {
     this.legR.add(legRM, shoeR);
     this.legL.position.set(-0.16, -0.04, 0);
     this.legR.position.set(0.16, -0.04, 0);
-    g.add(this.legL, this.legR);
+    bodyG.add(this.legL, this.legR);
 
     // --- trench coat (anime blazer shape, low-poly prism) ---
     const coatGeo = flatGeometry(new THREE.CylinderGeometry(0.2, 0.34, 0.92, 6, 1));
     coatGeo.translate(0, 0.5, 0);
     this.coat = new THREE.Mesh(coatGeo, coatMat);
     this.coat.position.y = 0;
-    g.add(this.coat);
+    bodyG.add(this.coat);
 
     // collar
     const collarGeo = flatGeometry(new THREE.TorusGeometry(0.17, 0.06, 5, 9, Math.PI * 0.9));
     collarGeo.rotateX(Math.PI / 2);
     this.collar = new THREE.Mesh(collarGeo, coatMat);
     this.collar.position.set(0, 0.98, 0);
-    g.add(this.collar);
+    bodyG.add(this.collar);
 
     // --- arms ---
     this.armL = new THREE.Group();
@@ -103,7 +108,7 @@ export class Player {
     armRM.position.y = -0.15;
     this.armR.add(armRM);
     this.armR.position.set(0.32, 0.62, 0);
-    g.add(this.armL, this.armR);
+    bodyG.add(this.armL, this.armR);
 
     // --- anime head: stylised face + big expressive eyes ---
     const headG = new THREE.Group();
@@ -121,7 +126,7 @@ export class Player {
       cx: 0, cy: 1.23, cz: 0.13, dist: 0.108, radius: 0.05, iris: 0x2a5f7f, width: 0.032,
     });
     buildAnimeMouth(headG, { cx: 0, cy: 1.06, cz: 0.15, width: 0.05 });
-    g.add(headG);
+    bodyG.add(headG);
     this.head = headG;
     const headMesh = skull;
 
@@ -139,7 +144,7 @@ export class Player {
     this.hat = new THREE.Group();
     this.hat.add(brim, crown, band);
     this.hat.position.y = 0.02;
-    g.add(this.hat);
+    bodyG.add(this.hat);
 
     // --- scarf (trailing ribbon, lags the turn) ---
     const scarfMat = makeToon(0xc98f3f, { rimStrength: 0.3 });
@@ -153,7 +158,7 @@ export class Player {
     this.scarfTail.position.set(0, 0.06, -0.36);
     this.scarf.add(knot, this.scarfTail);
     this.scarf.position.y = 1.0;
-    g.add(this.scarf);
+    bodyG.add(this.scarf);
     this.scarfYaw = Math.PI;
 
     // ink outlines on key pieces
@@ -168,6 +173,22 @@ export class Player {
     scene.add(g);
     this.mesh = g;
     this.legs = [this.legL, this.legR];
+  }
+
+  // аниме-пропорции конкретного героя: рост, вес, размер головы
+  applyBody(spec) {
+    if (!this.body || !spec) return;
+    const height = spec.height || 1;
+    const build = spec.build || 1;
+    const head = spec.head || 1;
+    this.body.scale.set(build, height, build);
+    if (this.head) this.head.scale.setScalar(head);
+    // рост сказывается и на хитбоксе, и на высоте камеры от первого лица
+    this.halfH = 0.82 * height;
+    this.halfW = 0.34 * build;
+    this.halfD = 0.3 * build;
+    this._headOffset = 1.28 * height * head;
+    this.bodySpec = { height, build, head };
   }
 
   reset() {
@@ -186,7 +207,7 @@ export class Player {
     this.oneWays = oneWays;
   }
 
-  get headHeight() { return this.halfH + 0.05; }
+  get headHeight() { return (this._headOffset || 1.28) + 0.05; }
 
   update(dt, input, cameraYaw, worldGatesSolids = []) {
     const solids = this.solids.concat(worldGatesSolids);
