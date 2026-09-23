@@ -1149,6 +1149,23 @@ this.player.grounded = true;
       this.driftCamera(dt);
     }
     this.animateProps(dt);
+    this.updateAmbience(dt);
+  }
+
+  // location-based ambience crossfade + altitude-scaled wind
+  updateAmbience(dt) {
+    const p = this.player.pos;
+    const zone = (x, z, r) => {
+      const dx = (p.x - x) / r;
+      const dz = (p.z - z) / r;
+      return Math.exp(-(dx * dx + dz * dz));
+    };
+    this.audio.setZone('bar', zone(32, 3, 26));
+    this.audio.setZone('plaza', zone(64, -33, 30));
+    this.audio.setZone('harbor', zone(196, 122, 44));
+    this.audio.setZone('drain', zone(132, 12, 24));
+    this.audio.setWind(Math.max(0, Math.min(1, p.y / 26 + zone(84, 4, 40) * 0.5)));
+    void dt;
   }
 
   setupGateSolids() {

@@ -7,6 +7,8 @@ export class AudioSys {
     this.muted = false;
     this.padTimer = null;
     this.windGain = null;
+    this.zones = {};
+    this.zoneGains = {};
   }
 
   init() {
@@ -87,6 +89,90 @@ export class AudioSys {
     };
     arp(0);
     delayed();
+    this.buildZones();
+  }
+
+  // --- location-based ambience layer (noir city texture) ---
+  buildZones() {
+    const makeZoneGain = (name) => {
+      const g = this.ctx.createGain();
+      g.gain.value = 0;
+      g.connect(this.master);
+      this.zoneGains[name] = g;
+      this.zones[name] = 0;
+    };
+    const zone = (name) => this.zoneGains[name];
+    const loop = (name, fn, minMs, maxMs) => {
+      const schedule = () => {
+        if (!this.enabled) return;
+        const w = this.zones[name] || 0;
+        if (w > 0.02) fn(w, this.ctx.currentTime);
+        setTimeout(schedule, minMs + Math.random() * (maxMs - minMs));
+      };
+      setTimeout(schedule, 400);
+    };
+
+    makeZoneGain('bar');   // bar "Сэм": vinyl crackle + deep double-bass thrum
+    loop('bar', (w, t) => {
+      this.noiseBurst(0.008 + Math.random() * 0.045, 800 + Math.random() * 2600, 0.010 * w);
+      if (Math.random() < 0.12) this.tone(-10 + (Math.random() * 3 | 0), 0.38, t, 0.012 * w, 1, 'sine', 82);
+    }, 45, 270);
+
+    makeZoneGain('harbor'); // foghorn + gull cries off the pier
+    loop('harbor', (w, t) => {
+      this.drone(52 + Math.random() * 10, 0.045 * w, 2.4 + Math.random() * 1.4);
+    }, 13000, 32000);
+    loop('harbor', (w, t) => {
+      const f = 950 + Math.random() * 300;
+      this.tone(0, 0.16, t, 0.011 * w, 1, 'sine', f);
+      setTimeout(() => this.tone(-1, 0.2, t + 0.15, 0.012 * w, 1, 'sine', f * 1.08), 150);
+    }, 2400, 8200);
+
+    makeZoneGain('plaza'); // pigeons cooing around the square
+    loop('plaza', (w, t) => {
+      const f = 300 + Math.random() * 40;
+      this.tone(-1, 0.13, t, 0.016 * w, 1, 'sine', f);
+      setTimeout(() => this.tone(-2, 0.16, t + 0.15, 0.016 * w, 1, 'sine', f * 0.97), 150);
+    }, 1700, 5600);
+
+    makeZoneGain('drain'); // echoey water drips in the cistern
+    loop('drain', (w, t) => {
+      this.tone(0, 0.05, t, 0.012 * w, 1, 'sine', 1500 + Math.random() * 500);
+    }, 650, 2300);
+  }
+
+  setZone(name, w) {
+    if (!this.ctx) return;
+    const target = Math.max(0, Math.min(1, w));
+    this.zones[name] = target;
+    const g = this.zoneGains[name];
+    if (g) g.gain.setTargetAtTime(target, this.ctx.currentTime, 1.1);
+  }
+
+  setWind(w) {
+    if (!this.windGain) return;
+    this.windGain.gain.setTargetAtTime(0.05 + Math.max(0, Math.min(1, w)) * 0.4, this.ctx.currentTime, 0.9);
+  }
+
+  drone(freq, gainV, dur) {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(gainV, t + dur * 0.35);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    const lp = this.ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = Math.min(freq * 4, 300);
+    for (const det of [0, 6]) {
+      const o = this.ctx.createOscillator();
+      o.type = 'sawtooth';
+      o.frequency.value = freq;
+      o.detune.value = det;
+      o.connect(lp).connect(g).connect(this.master);
+      o.start(t);
+      o.stop(t + dur + 0.1);
+    }
   }
 
   tone(semi, dur, t, gainV, freqMul = 1, type = 'sine', base = 110) {
