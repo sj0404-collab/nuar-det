@@ -106,6 +106,7 @@ export class Game {
     this.deck = [...STARTER_DECK];
     this.state = { hp: 100, maxHp: 100 };
     this.lensActive = false;
+    this.mount = null;
 
     // data
     this.gates = [];
@@ -807,6 +808,7 @@ export class Game {
   tryInteract() {
     if (this.mode !== 'explore') return;
     const p = this.player.pos;
+    if (this.mount) { this.dismount(true); return; }
     // NPC
     for (const n of this.world.npcs) {
       const dx = p.x - n.pos.x, dz = p.z - n.pos.z;
@@ -865,6 +867,59 @@ export class Game {
         return;
       }
     }
+    // transport
+    const v = this.findVehicleNear();
+    if (v) { this.board(v); }
+  }
+
+  // ---------------- riding / transport ----------------
+  findVehicleNear() {
+    const p = this.player.pos;
+    let best = null, bd = 25;
+    for (const v of this.world.traffic) {
+      const m = v.mesh.position;
+      const dx = p.x - m.x, dz = p.z - m.z;
+      const dd = dx * dx + dz * dz;
+      if (dd < bd) { bd = dd; best = v; }
+    }
+    return best;
+  }
+
+  board(v) {
+    const seatY = v.cab ? 1.15 : v.tram ? 0.7 : 0.95;
+    this.mount = { veh: v, seat: new THREE.Vector3(0, seatY, 0) };
+    this.hud.toast(v.cab ? 'Держитесь! Вы сели в фиакр (F или прыжок — выйти).' : 'Вы сели на транспорт (F или прыжок — выйти).');
+    this.audio.sfx('chest');
+  }
+
+  dismount(hop) {
+    const v = this.mount.veh;
+    const m = v.mesh.position;
+    const side = v.axis === 'z'
+      ? (v.fixed < 0 ? -1 : 1)
+      : (v.fixed < 0 ? -1 : 1);
+    const ox = v.axis === 'z' ? 4 * -side : 0;
+    const oz = v.axis === 'x' ? 4 * -side : 0;
+    this.player.pos.set(m.x + ox, Math.max(0.3, m.y + 0.3), m.z + oz);
+    this.player.vel.set((v.axis === 'z' ? ox : oz) * 1.5, hop ? 8 : 0, (v.axis === 'x' ? ox : oz) * 1.5);
+    this.player.grounded = false;
+    this.mount = null;
+    this.player.facing.set(ox || 1, 0, oz || 0).normalize();
+  }
+
+  updateMount(dt, t) {
+    const v = this.mount.veh;
+    const m = v.mesh;
+    const s = this.mount.seat;
+    this.player.pos.set(m.position.x + s.x, m.position.y + s.y, m.position.z + s.z);
+    const dx = v.axis === 'z' ? v.dir : 0;
+    const dz = v.axis === 'x' ? v.dir : 0;
+    if (dx !== 0 || dz !== 0) this.player.facing.set(dx, 0, dz).normalize();
+    this.player.mesh.rotation.y = Math.atan2(dx, dz);
+    const bob = Math.sin(t * 4.5) * 0.02;
+    this.player.mesh.position.set(this.player.pos.x, this.player.pos.y + 0.06 + bob, this.player.pos.z);
+this.player.grounded = true;
+    this.player.animate(dt * 0.4, 4, 0);
   }
 
   // ---------- combat ----------
@@ -1015,7 +1070,13 @@ export class Game {
       }
       if (input.interact) this.tryInteract();
 
-      this.player.update(dt * 1.0, this.input, this.cameraYaw, this.setupGateSolids());
+      if (this.mount && input.jump) this.dismount(true);
+
+      if (this.mount) {
+        this.updateMount(dt, t);
+      } else {
+        this.player.update(dt * 1.0, this.input, this.cameraYaw, this.setupGateSolids());
+      }
       this.updateCamera(dt);
       this.updateInteractions();
       this.checkZones();
@@ -1081,22 +1142,30 @@ export class Game {
   updateInteractions() {
     const p = this.player.pos;
     let near = null;
-    for (const n of this.world.npcs) {
-      const dx = p.x - n.pos.x, dz = p.z - n.pos.z;
-      if (dx * dx + dz * dz < 6) { near = { text: `${n.name} — F/взаимодействие`, interact: true }; break; }
-    }
-    if (!near) {
-      for (const it of this.world.items) {
-        if (it.taken) continue;
-        const dx = p.x - it.pos.x, dz = p.z - it.pos.z;
-        if (dx * dx + dz * dz < 5) { near = { text: `Подобрать: ${it.label} — F`, interact: true }; break; }
+    if (this.mount) {
+      near = { text: 'Выйти из транспорта — F', interact: true };
+    } else {
+      for (const n of this.world.npcs) {
+        const dx = p.x - n.pos.x, dz = p.z - n.pos.z;
+        if (dx * dx + dz * dz < 6) { near = { text: `${n.name} — F/взаимодействие`, interact: true }; break; }
       }
-    }
-    if (!near) {
-      for (const c of this.world.chests) {
-        if (c.opened) continue;
-        const dx = p.x - c.pos.x, dz = p.z - c.pos.z;
-        if (dx * dx + dz * dz < 6) { near = { text: `Сундук — F`, interact: true }; break; }
+      if (!near) {
+        for (const it of this.world.items) {
+          if (it.taken) continue;
+          const dx = p.x - it.pos.x, dz = p.z - it.pos.z;
+          if (dx * dx + dz * dz < 5) { near = { text: `Подобрать: ${it.label} — F`, interact: true }; break; }
+        }
+      }
+      if (!near) {
+        for (const c of this.world.chests) {
+          if (c.opened) continue;
+          const dx = p.x - c.pos.x, dz = p.z - c.pos.z;
+          if (dx * dx + dz * dz < 6) { near = { text: `Сундук — F`, interact: true }; break; }
+        }
+      }
+      if (!near && this.findVehicleNear()) {
+        const v = this.findVehicleNear();
+        near = { text: v.cab ? 'Сесть в фиакр — F' : 'Сесть на транспорт — F', interact: true };
       }
     }
     if (near) {
@@ -1126,6 +1195,7 @@ export class Game {
     const p = this.player.pos;
     for (const tr of this.world.transitions) {
       if (p.x >= tr.minX && p.x <= tr.maxX && p.z >= tr.minZ && p.z <= tr.maxZ && p.y >= tr.minY && p.y <= tr.maxY) {
+        if (this.mount) this.dismount(false);
         this.audio.sfx('dash');
         this.player.pos.set(tr.toX, tr.toY, tr.toZ);
         this.player.vel.set(0, 0, 0);
