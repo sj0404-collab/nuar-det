@@ -44,9 +44,15 @@ export class VoiceEngine {
       if ('speechSynthesis' in window) {
         this.synth = window.speechSynthesis;
         this.voices = this.synth.getVoices() || [];
-        this.synth.addEventListener('voiceschanged', () => {
-          this.voices = this.synth.getVoices() || [];
-        });
+        // старые WebView не имеют addEventListener на синтезе — не ломаем
+        // голоса, если события нет (иначе деградируем в «бипы»)
+        try {
+          if (typeof this.synth.addEventListener === 'function') {
+            this.synth.addEventListener('voiceschanged', () => {
+              this.voices = this.synth.getVoices() || [];
+            });
+          }
+        } catch (e) { /* voices still usable, just won't hot-reload */ }
       }
     } catch (e) { this.synth = null; }
   }
