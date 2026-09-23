@@ -234,7 +234,7 @@ export class VoiceEngine {
       const base = String(this._edgeRelay).replace(/\/+$/, '');
       fetch(base + '/google?text=' + encodeURIComponent(text) + '&tl=' + encodeURIComponent(tl), { mode: 'cors' })
         .then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(new Error('relay ' + r.status))))
-        .then((buf) => this._playBuf(buf, cb))
+        .then((buf) => this._playBuf(buf, cb, 'google'))
         .catch(() => this._googleDirect(text, direct, cb));
       return;
     }
@@ -256,7 +256,7 @@ export class VoiceEngine {
           const bin = atob(b64);
           const bytes = new Uint8Array(bin.length);
           for (let k = 0; k < bin.length; k++) bytes[k] = bin.charCodeAt(k);
-          this._playBuf(bytes.buffer, finish);
+          this._playBuf(bytes.buffer, finish, 'google');
         })
         .catch(() => finish(false));
     };
@@ -337,7 +337,7 @@ export class VoiceEngine {
     this._cleanupEdge();
     if (!chunks.length) { cb(false); return; }
     const mp3 = new Blob(chunks, { type: 'audio/mpeg' });
-    mp3.arrayBuffer().then((buf) => this._playBuf(buf, cb)).catch(() => cb(false));
+    mp3.arrayBuffer().then((buf) => this._playBuf(buf, cb, 'edge')).catch(() => cb(false));
   }
 
   // self-hosted OpenAI-compatible Edge TTS relay (/v1/audio/speech)
@@ -359,25 +359,36 @@ export class VoiceEngine {
       if (!res.ok) throw new Error('relay ' + res.status);
       return res.arrayBuffer();
     }).then((buf) => {
-      this._playBuf(buf, cb);
+      this._playBuf(buf, cb, 'edge');
     }).catch(() => cb(false));
   }
 
-  _playBuf(buf, cb) {
+  _playBuf(buf, cb, source) {
+    if (source) this._markSource(source);
     const ctx = this.audio.ctx || (this.audio.init(), this.audio.ctx);
     if (!ctx) { cb(false); return; }
     ctx.decodeAudioData(buf).then((audioBuf) => {
-      const src = ctx.createBufferSource();
-      src.buffer = audioBuf;
-      const g = ctx.createGain();
-      g.gain.value = this.audio.muted ? 0 : 0.55;
-      src.connect(g).connect(this.audio.master || ctx.destination);
-      this.speaking = true;
-      this._source = src;
-      src.onended = () => { this.speaking = false; this._source = null; };
-      if (ctx.state === 'suspended') ctx.resume();
-      src.start();
-      cb(true);
+      // если контекст/буфер не годятся — честно отказываемся, но не падаем:
+      // иначе реплика произносится дважды разными движками
+      if (!audioBuf) { cb(false); return; }
+      let started = false;
+      try {
+        const src = ctx.createBufferSource();
+        src.buffer = audioBuf;
+        const g = ctx.createGain();
+        g.gain.value = this.audio.muted ? 0 : 0.55;
+        src.connect(g).connect(this.audio.master || ctx.destination);
+        this.speaking = true;
+        this._source = src;
+        src.onended = () => { this.speaking = false; this._source = null; };
+        if (ctx.state === 'suspended') ctx.resume();
+        src.start();
+        started = true;
+      } catch (e) {
+        this.speaking = false;
+        this._source = null;
+      }
+      cb(started);
     }).catch(() => { this.speaking = false; cb(false); });
   }
 
