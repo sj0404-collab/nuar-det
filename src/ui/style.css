@@ -171,6 +171,20 @@ h1 {
 .subtitle { color: var(--fog); font-style: italic; margin: 10px 0 22px; letter-spacing: 1px; font-size: 16px; }
 .story-tease { color: var(--parch); line-height: 1.6; font-size: 15px; max-width: 620px; margin: 0 auto 26px; opacity: 0.9; }
 
+.persona-pick { margin: 22px auto 0; max-width: 620px; display: flex; flex-direction: column; gap: 10px; align-items: center; }
+.persona-head { color: var(--parch); font-size: 13px; letter-spacing: 2px; opacity: 0.75; text-transform: uppercase; }
+#persona-row { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; min-height: 40px; }
+.persona-btn {
+  min-width: 150px; min-height: var(--tap); padding: 10px 14px; font-family: inherit; cursor: pointer; text-align: left;
+  color: var(--parch); background: rgba(10,16,24,0.7); border: 1px solid rgba(212,165,89,0.4); border-radius: 6px;
+  transition: all 0.15s; pointer-events: auto; display: flex; flex-direction: column; gap: 3px;
+  border-left: 4px solid var(--persona-hue, var(--gold)); touch-action: manipulation;
+}
+.persona-btn .persona-name { font-size: 16px; font-weight: 700; }
+.persona-btn .persona-blurb { font-size: 12px; opacity: 0.7; line-height: 1.35; }
+.persona-btn:hover { background: rgba(212,165,89,0.16); }
+.persona-btn.active { border-color: var(--persona-hue, var(--gold)); box-shadow: 0 0 14px var(--persona-hue, var(--gold)); background: rgba(212,165,89,0.14); }
+
 .menu-buttons { display: flex; flex-direction: column; gap: 12px; justify-content: center; align-items: center; width: 100%; }
 .menu-btn {
   width: min(300px, 86vw); min-height: var(--tap); padding: 14px 18px; font-size: 16px; font-family: inherit; letter-spacing: 1px; cursor: pointer;

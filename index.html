@@ -79,15 +79,20 @@
         <p class="story-tease">
           Лондон никогда не был светлым. Но сейчас он пропитан насквозь магией,
           и городской туман завязан в узлы из снов, улик и чужих смертей.
-          Вы — Морвен Стоун, детектив с тенью вместо доверия.
-          Шерлок Холмс знал логику. Вы знаете кое-что пострашнее — метафорику вещей.
+          Выберите, за кого играть, и начните расследование — или просто осмотрите город.
+          Голос ваших реплик в диалогах настроится под выбранного героя.
         </p>
         <div class="menu-buttons">
           <button id="btn-continue" class="menu-btn primary hidden">Продолжить дело</button>
           <p id="save-status"></p>
           <button id="btn-start" class="menu-btn primary">Начать расследование</button>
+          <button id="btn-explore" class="menu-btn">Исследовать город</button>
           <button id="btn-credits" class="menu-btn">Как играть</button>
           <button id="btn-title-settings" class="menu-btn">Настройки</button>
+        </div>
+        <div class="persona-pick">
+          <div class="persona-head">Играть за:</div>
+          <div id="persona-row"></div>
         </div>
       </div>
     </div>
@@ -161,6 +166,7 @@
               <button id="btn-relay-save" class="menu-btn small">Сохранить адрес</button>
               <button id="btn-relay-test" class="menu-btn small">Проверить релей</button>
             </div>
+            <div class="tts-caps">Встроенный релей: файл workers/tts-relay.js в этом репозитории — Cloudflare Worker; после деплоя впишите его адрес сюда.</div>
           </div>
           <button id="btn-settings-back" class="menu-btn">Назад</button>
         </div>
