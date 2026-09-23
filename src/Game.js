@@ -83,7 +83,9 @@ export class Game {
     });
     this.holo = new HoloArena();
     this.screens = new Screens({
-      onStart: () => this.startGame(),
+      onStart: () => this.newGame(),
+      onContinue: () => this.continueGame(),
+      onSave: () => { this.saveGame(); this.hud.toast('Игра сохранена.'); },
       onResume: () => this.resumeFromPause(),
       onPause: () => this.togglePause(),
       onMap: () => this.toggleMap(),
@@ -96,6 +98,8 @@ export class Game {
       getVoiceEnabled: () => this.voice.enabled,
       onTimeSpeed: (mode) => this.setTimeMode(mode),
       getTimeMode: () => this.timeMode,
+      hasSave: () => this.hasSave(),
+      saveInfo: () => this.saveInfoText(),
     });
     this.screens.showTitle();
 
@@ -145,7 +149,7 @@ export class Game {
 
   initPanelListeners() {
     document.getElementById('btn-ending-title').addEventListener('click', () => this.toTitle());
-    document.getElementById('btn-ending-play').addEventListener('click', () => this.startGame());
+    document.getElementById('btn-ending-play').addEventListener('click', () => this.newGame());
     this.touch.setInteract(() => this.tryInteract());
   }
 
@@ -706,6 +710,118 @@ export class Game {
     this.touch.disable();
   }
 
+  // ---------- saves ----------
+  newGame() {
+    if (this.hasSave()) {
+      if (!window.confirm('Есть сохранённое дело. Начать заново и стереть его?')) return;
+      this.clearSave();
+    }
+    this.startGame();
+  }
+
+  hasSave() {
+    try { return !!localStorage.getItem('nuar_save_v1'); } catch (e) { return false; }
+  }
+
+  clearSave() {
+    try { localStorage.removeItem('nuar_save_v1'); } catch (e) { /* ignore */ }
+  }
+
+  saveInfoText() {
+    try {
+      const d = JSON.parse(localStorage.getItem('nuar_save_v1'));
+      if (!d) return '';
+      if (d.at) return 'Сохранение: ' + new Date(d.at).toLocaleString();
+      return 'Сохранение есть';
+    } catch (e) { return ''; }
+  }
+
+  saveGame() {
+    try {
+      const data = {
+        v: 1,
+        at: Date.now(),
+        checkpoint: { ...this.checkpoint },
+        flags: { ...this.flags },
+        seed: this.seed,
+        deck: [...this.deck],
+        state: { hp: this.state.hp, maxHp: this.state.maxHp },
+        inventory: [...this.player.inventory],
+        abilities: { ...this.player.abilities },
+        opened: this.world.chests.filter((c) => c.opened).map((c) => c.id),
+        taken: this.world.items.filter((it) => it.taken).map((it) => it.key || it.id),
+        dead: this.wisps.filter((w) => w.dead).map((w) => w.zone + '#' + w.baseX + ',' + w.baseZ),
+        bossDefeated: !!this.bossDefeated,
+      };
+      localStorage.setItem('nuar_save_v1', JSON.stringify(data));
+    } catch (e) { /* storage unavailable/full */ }
+  }
+
+  autosave() {
+    if (this.mode === 'title') return;
+    this.saveGame();
+  }
+
+  continueGame() {
+    if (!this.hasSave()) { this.startGame(); return; }
+    this.startGame();
+    this.loadGame();
+  }
+
+  loadGame() {
+    const raw = localStorage.getItem('nuar_save_v1');
+    if (!raw) return false;
+    try {
+      const d = JSON.parse(raw);
+      this.checkpoint = d.checkpoint || { x: 0, y: 1.2, z: 22 };
+      this.flags = d.flags || {};
+      this.seed = d.seed || 'truth';
+      this.deck = Array.isArray(d.deck) ? [...d.deck] : [...STARTER_DECK];
+      if (d.state) {
+        this.state.hp = d.state.hp;
+        this.state.maxHp = d.state.maxHp;
+      }
+      this.player.inventory.clear();
+      for (const k of d.inventory || []) this.player.inventory.add(k);
+      const ab = d.abilities || {};
+      this.player.abilities.dash = !!ab.dash;
+      this.player.abilities.jump = !!ab.jump;
+      this.player.abilities.wall = !!ab.wall;
+      this.player.abilities.lens = !!ab.lens;
+      const opened = new Set(d.opened || []);
+      for (const c of this.world.chests) c.opened = opened.has(c.id);
+      const taken = new Set(d.taken || []);
+      for (const it of this.world.items) {
+        const key = it.key || it.id;
+        it.taken = taken.has(key);
+        if (it.taken) {
+          it.mesh.visible = false;
+          it.halo.visible = false;
+          it.ring.visible = false;
+          it.glint.visible = false;
+        }
+      }
+      const dead = new Set(d.dead || []);
+      for (const w of this.wisps) {
+        const key = w.zone + '#' + w.baseX + ',' + w.baseZ;
+        if (dead.has(key)) { w.dead = true; if (w.mesh) w.mesh.visible = false; }
+      }
+      this.bossDefeated = !!d.bossDefeated;
+      this.mount = null;
+      this.player.vel.set(0, 0, 0);
+      this.player.pos.set(this.checkpoint.x, this.checkpoint.y, this.checkpoint.z);
+      this.cameraYaw = Math.PI;
+      this.cameraPitch = -0.12;
+      this.checkGatesAuto(false);
+      this.updateHud();
+      this.hud.showHint('Сохранённое дело продолжено.', true);
+      setTimeout(() => this.hud.hideHint(), 2600);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
   togglePause() {
     if (this.mode === 'explore') {
       this.mode = 'pause';
@@ -1020,6 +1136,7 @@ this.player.grounded = true;
         this.bossDefeated = true;
         this.effects.bursts.emit(new THREE.Vector3(-10, 2, -216), { count: 80, color: { r: 1, g: 0.5, b: 0.3 }, speed: 6, spread: 4, lift: 4, gravity: 2, size: 0.7 });
       }
+      this.autosave();
       this.audio.sfx('unlock');
       this.hud.toast('Победа! Туман отступает.');
     } else {
@@ -1254,6 +1371,7 @@ this.player.grounded = true;
           this.hud.toast(`◆ ${z.label}`);
           // checkpoint at zone center
           this.checkpoint = { x: (z.minX + z.maxX) / 2, y: Math.max(1.2, z.minY + 0.8), z: (z.minZ + z.maxZ) / 2 };
+          this.autosave();
         }
       }
     }
@@ -1268,6 +1386,7 @@ this.player.grounded = true;
         this.player.pos.set(tr.toX, tr.toY, tr.toZ);
         this.player.vel.set(0, 0, 0);
         if (tr.take === 'up') this.checkpoint = { x: 130, y: 1.2, z: 40 };
+        if (tr.take) this.autosave();
         this.hud.toast(tr.take === 'down' ? 'Спуск в цистерну' : 'Подъём на рынок');
         return;
       }

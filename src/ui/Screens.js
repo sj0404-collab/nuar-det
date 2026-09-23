@@ -104,10 +104,10 @@ export class Screens {
     this.mapUI = new MapUI(document.getElementById('map-canvas'), document.getElementById('map-legend'));
   }
 
-  showTitle() { this.title.classList.remove('hidden'); this.credits.classList.add('hidden'); this.pause.classList.add('hidden'); this.settings.classList.add('hidden'); this.map.classList.add('hidden'); if (this._refreshSound) this._refreshSound(); if (this._refreshVoice) this._refreshVoice(); if (this._refreshTime) this._refreshTime(); }
+  showTitle() { this.title.classList.remove('hidden'); this.credits.classList.add('hidden'); this.pause.classList.add('hidden'); this.settings.classList.add('hidden'); this.map.classList.add('hidden'); if (this._refreshSound) this._refreshSound(); if (this._refreshVoice) this._refreshVoice(); if (this._refreshTime) this._refreshTime(); this.refreshSave(); }
   showCredits() { this.credits.classList.remove('hidden'); this.title.classList.remove('hidden'); }
   hideTitle() { this.title.classList.add('hidden'); }
-  showPause() { this.pause.classList.remove('hidden'); this.settings.classList.add('hidden'); if (this._refreshTime) this._refreshTime(); }
+  showPause() { this.pause.classList.remove('hidden'); this.settings.classList.add('hidden'); if (this._refreshTime) this._refreshTime(); this.refreshSave(); }
   hidePause() { this.pause.classList.add('hidden'); }
   showSettings() {
     this.title.classList.add('hidden');
@@ -130,6 +130,18 @@ export class Screens {
   setHud(hud) {
     document.getElementById('btn-map').addEventListener('click', () => this.hooks.onMap && this.hooks.onMap());
     document.getElementById('btn-menu').addEventListener('click', () => this.hooks.onPause && this.hooks.onPause());
+
+    this._continueBtn = document.getElementById('btn-continue');
+    this._saveStatus = document.getElementById('save-status');
+    const saveBtn = document.getElementById('btn-save');
+    if (saveBtn) saveBtn.addEventListener('click', () => this.hooks.onSave && this.hooks.onSave());
+    if (this._continueBtn) this._continueBtn.addEventListener('click', () => this.hooks.onContinue && this.hooks.onContinue());
+  }
+
+  refreshSave() {
+    const hasSave = this.hooks.hasSave ? !!this.hooks.hasSave() : false;
+    if (this._continueBtn) this._continueBtn.classList.toggle('hidden', !hasSave);
+    if (this._saveStatus) this._saveStatus.textContent = hasSave && this.hooks.saveInfo ? (this.hooks.saveInfo() || 'Сохранение есть') : '';
   }
 
   updateMap(world, playerPos, flags) {

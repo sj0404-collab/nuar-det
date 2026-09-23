@@ -70,6 +70,8 @@
           Шерлок Холмс знал логику. Вы знаете кое-что пострашнее — метафорику вещей.
         </p>
         <div class="menu-buttons">
+          <button id="btn-continue" class="menu-btn primary hidden">Продолжить дело</button>
+          <p id="save-status"></p>
           <button id="btn-start" class="menu-btn primary">Начать расследование</button>
           <button id="btn-credits" class="menu-btn">Как играть</button>
           <button id="btn-title-settings" class="menu-btn">Настройки</button>
@@ -102,6 +104,7 @@
             <input id="cam-sens-slider" type="range" min="0.2" max="3" step="0.1" value="1">
           </div>
           <button id="btn-time-speed" class="menu-btn">Время суток: устройство</button>
+          <button id="btn-save" class="menu-btn">Сохранить игру</button>
           <button id="btn-map-full" class="menu-btn">Карта города</button>
           <button id="btn-to-title" class="menu-btn">В титул</button>
         </div>
@@ -177,7 +180,7 @@
     </div>
 
     <div id="toast"></div>
-    <div id="load-screen">Загрузка мира...</div>
+    <div id="load-screen">Загрузка мира...<span id="load-tip"></span></div>
     <div id="rotate-hint">
       <div class="phone">📱</div>
       <div>Поверните телефон вертикально — игра работает в портретной ориентации</div>

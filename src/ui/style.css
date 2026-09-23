@@ -310,3 +310,6 @@ h1 {
   --cardw: 96px; --cardh: 148px;
   :root { --cardw: 96px; --cardh: 148px; }
 }
+#btn-continue { order: -1; }
+#save-status { color: #7a8ea6; font-size: 13px; min-height: 16px; margin: 2px 0 10px; }
+#load-screen span { display: block; margin-top: 8px; color: #9fb2c4; font-size: 13px; opacity: .85; max-width: 280px; }
