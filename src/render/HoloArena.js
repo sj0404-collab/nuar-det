@@ -310,7 +310,10 @@ export class HoloArena {
     this._auraColor = tint.getHex();
     this.aura.material.color.copy(tint);
     this.coreMat.color.copy(tint);
-    this.coreMat.color.multiplyScalar(1.3).min(new THREE.Color(1, 1, 1));
+    const r = Math.min(this.coreMat.color.r * 1.3, 1);
+    const g = Math.min(this.coreMat.color.g * 1.3, 1);
+    const b = Math.min(this.coreMat.color.b * 1.3, 1);
+    this.coreMat.color.setRGB(r, g, b);
     this.shardMat.color.copy(tint);
     this.enemy.scale.setScalar(0.05);
     this.enemy.visible = true;

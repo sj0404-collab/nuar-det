@@ -16,6 +16,30 @@ export class CombatUI {
     document.getElementById('btn-end-turn').addEventListener('click', () => {
       this.hooks.onEndTurn && this.hooks.onEndTurn();
     });
+    document.getElementById('btn-flee').addEventListener('click', () => {
+      this.hooks.onFlee && this.hooks.onFlee();
+    });
+    this.result = document.getElementById('combat-result');
+    this.retryBtn = document.getElementById('btn-c-retry');
+    this.giveBtn = document.getElementById('btn-c-give');
+    this.titleBtn = document.getElementById('btn-c-title');
+    if (this.retryBtn) this.retryBtn.addEventListener('click', () => this.hooks.onRetry && this.hooks.onRetry());
+    if (this.giveBtn) this.giveBtn.addEventListener('click', () => this.hooks.onGiveUp && this.hooks.onGiveUp());
+    if (this.titleBtn) this.titleBtn.addEventListener('click', () => this.hooks.onTitle && this.hooks.onTitle());
+  }
+
+  showResult(combat) {
+    if (!this.result) return;
+    this.result.classList.remove('hidden');
+    this.result.querySelector('#c-result-text').textContent = combat.won
+      ? 'Туман отступает. Победа!'
+      : (combat.retreated ? 'Вы сбежали из тумана.' : 'Над вами сомкнулся туман. Поражение.');
+    if (this.retryBtn) this.retryBtn.classList.toggle('hidden', combat.won || !!combat.retreated);
+    if (this.giveBtn) this.giveBtn.classList.toggle('hidden', combat.won);
+  }
+
+  hideResult() {
+    if (this.result) this.result.classList.add('hidden');
   }
 
   open(combat, state) {
@@ -23,6 +47,7 @@ export class CombatUI {
     this.screen.classList.remove('hidden');
     this.combat = combat;
     this.state = state;
+    this.hideResult();
     this.render(combat, state);
   }
 
@@ -31,6 +56,7 @@ export class CombatUI {
     this.screen.classList.add('hidden');
     this.hand.innerHTML = '';
     this.cardEls = [];
+    this.hideResult();
   }
 
   render(combat, state) {
@@ -90,7 +116,7 @@ export class CombatUI {
 
   renderEndTurn(combat) {
     const btn = document.getElementById('btn-end-turn');
-    btn.disabled = combat.over || combat.playerBlock;
+    btn.disabled = combat.over;
     btn.textContent = combat.over ? '' : 'Завершить ход »';
   }
 }

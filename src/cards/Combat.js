@@ -6,10 +6,12 @@ export class Combat {
     this.turn = 0;
     this.over = false;
     this.won = false;
+    this.retreated = false;
   }
 
   startCombat(enemyId) {
     const def = ENEMIES[enemyId];
+    this.enemyId = enemyId;
     this.enemy = {
       ...def,
       hp: def.hp,
@@ -32,6 +34,7 @@ export class Combat {
     this.log = [];
     this.over = false;
     this.won = false;
+    this.retreated = false;
     for (let i = 0; i < 5; i++) this.draw();
     this.logLine(`Туман сгущается. ${def.name} выходит на свет фонаря.`);
   }
@@ -49,6 +52,7 @@ export class Combat {
       this.shuffle(this.discard);
       this.deck = this.discard;
       this.discard = [];
+      this.logLine('Колода перетасована.');
     }
     const c = this.deck.pop();
     this.hand.push(c);
@@ -161,6 +165,11 @@ export class Combat {
     this.over = true;
     this.won = false;
     this.retreated = true;
+    this.logLine('Вы выскользнули из тумана...');
+  }
+
+  restartEnemy() {
+    this.startCombat(this.enemyId);
   }
 
   finishWin() {

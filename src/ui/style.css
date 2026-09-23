@@ -263,6 +263,16 @@ h1 {
 }
 #combat-top { position: absolute; top: 8px; right: 10px; display: flex; flex-direction: column; gap: 8px; align-items: flex-end; }
 #turn-indicator { color: var(--gold); letter-spacing: 2px; text-transform: uppercase; font-size: 13px; }
+.menu-btn.warn { color: var(--parch); border-color: rgba(176,52,46,0.6);}
+.menu-btn.warn:hover { background: rgba(176,52,46,0.25); }
+
+#combat-result {
+  position: absolute; left: 50%; top: 44%; transform: translate(-50%, -50%);
+  background: rgba(5,8,13,0.94); border: 1px solid rgba(140,150,160,0.5); border-radius: 10px;
+  padding: 20px 26px; z-index: 55; text-align: center; box-shadow: 0 10px 40px rgba(0,0,0,0.7);
+}
+#combat-result h3 { color: var(--blood); letter-spacing: 2px; text-transform: uppercase; margin-bottom: 14px; }
+#combat-result .menu-buttons { display: flex; flex-direction: column; gap: 8px; min-width: 220px; }
 
 /* ---------- Toast ---------- */
 #toast {

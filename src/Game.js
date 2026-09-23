@@ -80,6 +80,10 @@ export class Game {
     this.combatUI = new CombatUI({
       onPlay: (i) => this.onCombatPlay(i),
       onEndTurn: () => this.onCombatEndTurn(),
+      onFlee: () => this.onCombatFlee(),
+      onRetry: () => this.onCombatRetry(),
+      onGiveUp: () => this.onCombatGiveUp(),
+      onTitle: () => this.onCombatToTitle(),
     });
     this.holo = new HoloArena();
     this.screens = new Screens({
@@ -1120,38 +1124,88 @@ this.player.grounded = true;
     if (this.combat.over) this.resolveCombat();
   }
 
+  onCombatFlee() {
+    if (!this.combat || this.combat.over) return;
+    this.combat.retreat(); // just logs
+    this.state.hp = Math.max(1, this.state.hp - 10);
+    this.player.hp = this.state.hp;
+    this.player.pos.set(this.checkpoint.x, this.checkpoint.y, this.checkpoint.z);
+    this.audio.sfx('jump');
+    this.hud.toast('Вы выскользнули из тумана (−10 ❤).');
+    if (this.activeWisp) this.activeWisp.dead = false;
+    this.endCombatCleanup();
+  }
+
+  onCombatRetry() {
+    if (!this.combat) return;
+    const enemyId = this.combat.enemyId;
+    this.state.hp = this.state.maxHp;
+    this.player.hp = this.state.maxHp;
+    this.combat.restartEnemy();
+    this.holo.open(this.combat.enemy);
+    this.combatUI.hideResult();
+    this.combatUI.render(this.combat, this.state);
+    this.audio.sfx('ui');
+    this.hud.toast('Туман вновь сгущается. Бой начинается.');
+  }
+
+  onCombatGiveUp() {
+    if (!this.combat) return;
+    this.deathPenalty(10);
+    this.endCombatCleanup();
+  }
+
+  onCombatToTitle() {
+    this.combat = null;
+    this.combatUI.close();
+    this.holo.close();
+    this.toTitle();
+  }
+
+  deathPenalty(hpPenalty) {
+    this.state.hp = Math.max(1, this.state.hp - hpPenalty);
+    this.player.hp = this.state.hp;
+    this.player.pos.set(this.checkpoint.x, this.checkpoint.y, this.checkpoint.z);
+    this.audio.sfx('death');
+    this.hud.toast('Туман смыкается... вы очнулись у чекпоинта.');
+    if (this.activeWisp) this.activeWisp.dead = false;
+    this.updateHud();
+  }
+
+  endCombatCleanup() {
+    this.combatUI.close();
+    this.combat = null;
+    this.mode = 'explore';
+    this.holo.close();
+    this.updateHud();
+  }
+
   resolveCombat() {
     if (this.combat.won) {
-      const rew = ENEMIES[this.activeWisp ? this.activeWisp.enemyId : 'boss'].reward;
+      const enemyId = this.combat.enemyId;
+      const rew = ENEMIES[enemyId]?.reward;
       if (rew) {
         for (const c of rew.cards) {
           if (CARDS[c]) this.deck.push(c);
         }
       }
       this.player.hp = Math.min(this.player.maxHp, this.state.hp + 18);
-      if (this.activeWisp) {
-        this.activeWisp.dead = true;
-        this.effects.bursts.emit(this.activeWisp.mesh.position.clone(), { count: 34, color: { r: 0.9, g: 0.45, b: 0.35 }, speed: 4.5, spread: 1.8, lift: 3, gravity: 1.5, size: 0.55 });
-      } else {
+      if (enemyId === 'boss') {
         this.bossDefeated = true;
         this.effects.bursts.emit(new THREE.Vector3(-10, 2, -216), { count: 80, color: { r: 1, g: 0.5, b: 0.3 }, speed: 6, spread: 4, lift: 4, gravity: 2, size: 0.7 });
+      } else if (this.activeWisp) {
+        this.activeWisp.dead = true;
+        this.effects.bursts.emit(this.activeWisp.mesh.position.clone(), { count: 34, color: { r: 0.9, g: 0.45, b: 0.35 }, speed: 4.5, spread: 1.8, lift: 3, gravity: 1.5, size: 0.55 });
       }
       this.autosave();
       this.audio.sfx('unlock');
       this.hud.toast('Победа! Туман отступает.');
+      this.endCombatCleanup();
     } else {
-      this.state.hp = 40;
-      this.player.hp = 40;
-      this.player.pos.set(this.checkpoint.x, this.checkpoint.y, this.checkpoint.z);
-      this.audio.sfx('death');
-      this.hud.toast('Туман смыкается... вы очнулись.');
-      if (this.activeWisp) this.activeWisp.dead = false;
+      this.combatUI.showResult(this.combat);
+      this.audio.sfx(this.combat.retreated ? 'jump' : 'death');
+      this.hud.toast(this.combat.retreated ? 'Вы отступили.' : 'Туман сомкнулся.');
     }
-    this.combatUI.close();
-    this.combat = null;
-    this.mode = 'explore';
-    this.holo.close();
-    this.updateHud();
     if (this.bossDefeated && !this.flags.finalShown) {
       this.flags.finalShown = true;
       this.mode = 'dialogue';
