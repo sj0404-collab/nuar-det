@@ -18,6 +18,7 @@ import { makePainterlyMaterial, addInkOutline, flatGeometry } from './render/Pai
 import { buildAnimeEyes, buildAnimeHair, buildAnimeMouth, makeToon } from './render/AnimeFigure.js';
 import { Effects } from './render/Particles.js';
 import { GlowSprites } from './render/GlowSprites.js';
+import { HoloArena } from './render/HoloArena.js';
 
 const ABILITY_KEYS = { dash: 'dash', jump: 'jump', wall: 'wall', lens: 'lens' };
 
@@ -75,6 +76,7 @@ export class Game {
       onPlay: (i) => this.onCombatPlay(i),
       onEndTurn: () => this.onCombatEndTurn(),
     });
+    this.holo = new HoloArena();
     this.screens = new Screens({
       onStart: () => this.startGame(),
       onResume: () => this.resumeFromPause(),
@@ -857,11 +859,15 @@ export class Game {
     this.combat.startCombat(enemyId);
     this.activeWisp = wisp;
     this.combatUI.open(this.combat, this.state);
+    this.holo.open(this.combat.enemy);
   }
 
   onCombatPlay(i) {
     const r = this.combat.play(i);
-    if (r) this.audio.sfx(r.card.fx.type === 'block' || r.card.fx.type === 'heal' ? 'card' : 'hit');
+    if (r) {
+      this.audio.sfx(r.card.fx.type === 'block' || r.card.fx.type === 'heal' ? 'card' : 'hit');
+      this.holo.play(r);
+    }
     if (this.combat.over) this.combatUI.render(this.combat, this.state);
     this.combatUI.render(this.combat, this.state);
     if (this.combat.over) this.resolveCombat();
@@ -870,6 +876,7 @@ export class Game {
   onCombatEndTurn() {
     this.combat.endTurn();
     this.audio.sfx('enemy');
+    this.holo.enemyTurn();
     this.combatUI.render(this.combat, this.state);
     if (this.combat.over) this.resolveCombat();
   }
@@ -903,6 +910,7 @@ export class Game {
     this.combatUI.close();
     this.combat = null;
     this.mode = 'explore';
+    this.holo.close();
     this.updateHud();
     if (this.bossDefeated && !this.flags.finalShown) {
       this.flags.finalShown = true;
@@ -968,6 +976,7 @@ export class Game {
       this.timeCycle.hour, this.timeCycle.minute, this.timeCycle.second, dayFactor
     );
     this.effects.rain.points.visible = this.player.pos.y > -5;
+    this.holo.update(t, dt);
 
     if (this.mode === 'ending') {
       this.driftCamera(dt);

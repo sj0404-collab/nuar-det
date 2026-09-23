@@ -206,8 +206,14 @@ h1 {
   position: absolute; inset: 0; z-index: 45; pointer-events: auto;
   background: linear-gradient(rgba(6,10,16,0.88), rgba(2,4,8,0.94));
   display: flex; align-items: center; justify-content: center;
+  overflow: hidden;
 }
-#combat-stage { position: relative; width: min(920px, 96vw); height: min(560px, 92vh); padding: 10px; }
+#holo-stage {
+  position: absolute; inset: 0; z-index: 46; pointer-events: none;
+  mix-blend-mode: screen;
+}
+#holo-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+#combat-stage { position: relative; z-index: 47; width: min(920px, 96vw); height: min(560px, 92vh); padding: 10px; }
 #enemy-zone { position: absolute; top: 8px; left: 50%; transform: translateX(-50%); text-align: center; }
 #enemy-card {
   width: 190px; height: 260px; margin: 0 auto; border-radius: 10px;
