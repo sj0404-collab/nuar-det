@@ -321,6 +321,29 @@ export function buildTraffic(world) {
 export function updateTraffic(traffic, dt, t) {
   for (const c of traffic) {
     const m = c.mesh;
+    if (c.playerDriven) {
+      // водитель управляет сам: скорость и поворот уже заданы из Game.updateMount
+      const sp = c.speed * dt;
+      m.position.x += Math.sin(m.rotation.y) * sp;
+      m.position.z += Math.cos(m.rotation.y) * sp;
+      for (const w of m.userData.wheels || []) {
+        w.rotation.x += (c.speed / 0.32) * dt;
+      }
+      if (c.cab && m.userData.body) {
+        const phase = t * 5.2 + c.phase;
+        const pair = Math.sin(phase) * 0.45;
+        m.userData.legs[0].rotation.z = pair;
+        m.userData.legs[3].rotation.z = pair;
+        m.userData.legs[1].rotation.z = -pair;
+        m.userData.legs[2].rotation.z = -pair;
+        m.userData.body.position.y = 1.0 + Math.abs(Math.cos(phase)) * 0.05;
+        m.position.y = Math.abs(Math.cos(phase * 0.5)) * 0.03;
+      } else {
+        m.position.y = Math.sin(t * 0.9 + c.phase) * 0.015;
+        m.rotation.z = Math.sin(t * 0.9 + c.phase) * 0.01;
+      }
+      continue;
+    }
     if (c.axis === 'z') {
       let z = m.position.z + c.dir * c.speed * dt;
       if (z > c.max) z = c.min;

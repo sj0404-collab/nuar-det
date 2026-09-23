@@ -7,6 +7,7 @@ export class Input {
     this.moveZ = 0;
     this.jumpHeld = false;
     this.jumpPressed = false;
+    this.jumpSpace = false;
     this.dashPressed = false;
     this.interactPressed = false;
     this.lensPressed = false;
@@ -58,7 +59,12 @@ export class Input {
       const k = e.key.toLowerCase();
       this.keys.add(k);
       this.pressed.add(k);
-      if (k === ' ' || k === 'arrowup' || k === 'w') { this.jumpHeld = true; this.jumpPressed = true; e.preventDefault(); }
+      if (k === ' ' || k === 'arrowup' || k === 'w') {
+        this.jumpHeld = true;
+        this.jumpPressed = true;
+        if (k === ' ') this.jumpSpace = true;
+        e.preventDefault();
+      }
       if (k === 'shift') { this.dashPressed = true; }
       if (k === 'f' || k === 'а') { this.interactPressed = true; }
       if (k === 'q' || k === 'й') { this.camKeyHeld = -1; }
@@ -105,10 +111,12 @@ export class Input {
       pause: this.pausePressed,
       deck: this.deckPressed,
       camMode: this.camModePressed,
+      jumpSpace: this.jumpSpace,
     };
     this._jump = out.jump;
     this._dash = out.dash;
     this.jumpPressed = false;
+    this.jumpSpace = false;
     this.dashPressed = false;
     this.interactPressed = false;
     this.lensPressed = false;

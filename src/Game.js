@@ -128,6 +128,7 @@ export class Game {
     this.state = { hp: 100, maxHp: 100 };
     this.lensActive = false;
     this.mount = null;
+    this.pendingVehicle = null;
 
     // data
     this.gates = [];
@@ -166,6 +167,8 @@ export class Game {
   initPanelListeners() {
     document.getElementById('btn-ending-title').addEventListener('click', () => this.toTitle());
     document.getElementById('btn-ending-play').addEventListener('click', () => this.newGame());
+    document.getElementById('btn-seat-driver').addEventListener('click', () => this.confirmBoard(true));
+    document.getElementById('btn-seat-passenger').addEventListener('click', () => this.confirmBoard(false));
     this.touch.setInteract(() => this.tryInteract());
   }
 
@@ -1069,14 +1072,31 @@ export class Game {
   }
 
   board(v) {
+    this.pendingVehicle = v;
+    document.getElementById('seat-choice').classList.remove('hidden');
+    this.audio.sfx('chest');
+  }
+
+  confirmBoard(asDriver) {
+    const v = this.pendingVehicle;
+    if (!v) return;
+    this.pendingVehicle = null;
+    document.getElementById('seat-choice').classList.add('hidden');
     const seatY = v.cab ? 1.15 : v.tram ? 0.7 : 0.95;
-    this.mount = { veh: v, seat: new THREE.Vector3(0, seatY, 0) };
-    this.hud.toast(v.cab ? 'Держитесь! Вы сели в фиакр (F или прыжок — выйти).' : 'Вы сели на транспорт (F или прыжок — выйти).');
+    if (asDriver && v.baseSpeed === undefined) v.baseSpeed = v.speed;
+    this.mount = { veh: v, seat: new THREE.Vector3(0, seatY, 0), driver: asDriver };
+    this.hud.toast(asDriver
+      ? 'Вы за рулём! W/S — газ и тормоз, A/D — поворот, выход — F или пробел.'
+      : 'Вы пассажир. Транспорт едет по маршруту, выход — F или пробел.');
     this.audio.sfx('chest');
   }
 
   dismount(hop) {
     const v = this.mount.veh;
+    if (this.mount.driver) {
+      v.playerDriven = false;
+      if (v.baseSpeed !== undefined) v.speed = v.baseSpeed;
+    }
     const m = v.mesh.position;
     const side = v.axis === 'z'
       ? (v.fixed < 0 ? -1 : 1)
@@ -1090,18 +1110,36 @@ export class Game {
     this.player.facing.set(ox || 1, 0, oz || 0).normalize();
   }
 
-  updateMount(dt, t) {
+updateMount(dt, t) {
     const v = this.mount.veh;
     const m = v.mesh;
     const s = this.mount.seat;
     this.player.pos.set(m.position.x + s.x, m.position.y + s.y, m.position.z + s.z);
-    const dx = v.axis === 'z' ? v.dir : 0;
-    const dz = v.axis === 'x' ? v.dir : 0;
-    if (dx !== 0 || dz !== 0) this.player.facing.set(dx, 0, dz).normalize();
-    this.player.mesh.rotation.y = Math.atan2(dx, dz);
+
+    if (this.mount.driver && v.cab) {
+      // водитель: газ по axis2D, поворот по axis.x
+      const axis = this.input.axis2D();
+      const throttle = -axis.z; // W (z=-1) — вперёд
+      v.speed += (throttle * 14 - v.speed) * Math.min(1, dt * 2.2);
+      if (Math.abs(axis.x) > 0.12 && Math.abs(v.speed) > 0.4) {
+        v.mesh.rotation.y += axis.x * dt * 1.3 * Math.sign(v.speed);
+      }
+      v.dir = v.speed >= 0 ? 1 : -1;
+      v.playerDriven = true;
+      if (v.speed < 0.05) v.speed = 0;
+      this.player.mesh.rotation.y = v.mesh.rotation.y;
+      this.player.facing.set(Math.sin(v.mesh.rotation.y), 0, Math.cos(v.mesh.rotation.y));
+    } else {
+      // пассажир: транспорт едет по своему маршруту
+      v.playerDriven = false;
+      const dx = v.axis === 'z' ? v.dir : 0;
+      const dz = v.axis === 'x' ? v.dir : 0;
+      if (dx !== 0 || dz !== 0) this.player.facing.set(dx, 0, dz).normalize();
+      this.player.mesh.rotation.y = Math.atan2(dx, dz);
+    }
     const bob = Math.sin(t * 4.5) * 0.02;
     this.player.mesh.position.set(this.player.pos.x, this.player.pos.y + 0.06 + bob, this.player.pos.z);
-this.player.grounded = true;
+    this.player.grounded = true;
     this.player.animate(dt * 0.4, 4, 0);
   }
 
@@ -1305,7 +1343,7 @@ this.player.grounded = true;
       }
       if (input.interact) this.tryInteract();
 
-      if (this.mount && input.jump) this.dismount(true);
+      if (this.mount && input.jumpSpace) this.dismount(true);
 
       if (this.mount) {
         this.updateMount(dt, t);
@@ -1433,7 +1471,7 @@ this.player.grounded = true;
     const p = this.player.pos;
     let near = null;
     if (this.mount) {
-      near = { text: 'Выйти из транспорта — F', interact: true };
+      near = { text: 'Выйти из транспорта — F или пробел', interact: true };
     } else {
       for (const n of this.world.npcs) {
         const dx = p.x - n.pos.x, dz = p.z - n.pos.z;
