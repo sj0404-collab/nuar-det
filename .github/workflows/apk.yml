@@ -34,8 +34,18 @@ jobs:
         working-directory: android
         run: gradle assembleRelease --no-daemon
 
+      # Имя файла должно совпадать с `apk` в version.json, иначе оболочка
+      # не сможет скачать обновление по ссылке с сайта.
+      - name: Rename APK to match version.json
+        working-directory: android
+        run: |
+          APK=$(ls app/build/outputs/apk/release/*.apk | head -1)
+          cp -f "$APK" app/build/outputs/apk/release/nuar-det.apk
+
       - name: Upload APK to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: android/app/build/outputs/apk/release/*.apk
+          files: |
+            android/app/build/outputs/apk/release/nuar-det.apk
+            android/app/build/outputs/apk/release/app-release.apk
           generate_release_notes: true
