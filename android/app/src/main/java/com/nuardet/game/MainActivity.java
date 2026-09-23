@@ -22,6 +22,8 @@ import android.view.Window;
 import android.view.WindowManager;
 import android.webkit.JavascriptInterface;
 import android.webkit.CookieManager;
+import android.webkit.JsResult;
+import android.webkit.WebChromeClient;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
@@ -228,6 +230,32 @@ public class MainActivity extends Activity {
                 // проверяем обновления только когда игра уже загрузилась и
                 // точно не блокируем титульный экран
                 maybeCheckForUpdate();
+            }
+        });
+
+        // Нативные диалоги для JS alert/confirm: иначе WebView молча возвращает
+        // false, и кнопка «Начать расследование» перестаёт работать при
+        // наличии автосохранённого дела (window.confirm в newGame).
+        web.setWebChromeClient(new WebChromeClient() {
+            @Override
+            public boolean onJsAlert(WebView view, String url, String message, JsResult result) {
+                new AlertDialog.Builder(MainActivity.this)
+                        .setMessage(message)
+                        .setPositiveButton("OK", (d, w) -> { result.confirm(); })
+                        .setOnCancelListener(d -> { result.cancel(); })
+                        .show();
+                return true;
+            }
+
+            @Override
+            public boolean onJsConfirm(WebView view, String url, String message, JsResult result) {
+                new AlertDialog.Builder(MainActivity.this)
+                        .setMessage(message)
+                        .setPositiveButton("Да", (d, w) -> { result.confirm(); })
+                        .setNegativeButton("Нет", (d, w) -> { result.cancel(); })
+                        .setOnCancelListener(d -> { result.cancel(); })
+                        .show();
+                return true;
             }
         });
 
