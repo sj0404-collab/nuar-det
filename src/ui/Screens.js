@@ -101,7 +101,67 @@ export class Screens {
       this._refreshTime = refreshTime;
     }
 
+    // horizontal camera invert toggle
+    const invertCamBtn = document.getElementById('btn-invert-cam');
+    if (invertCamBtn) {
+      const refreshInvertCam = () => {
+        const cur = localStorage.getItem('nuar_invert_cam') === '1';
+        invertCamBtn.textContent = 'Инверсия камеры по горизонтали: ' + (cur ? 'вкл' : 'выкл');
+      };
+      invertCamBtn.addEventListener('click', () => {
+        const cur = localStorage.getItem('nuar_invert_cam') === '1';
+        localStorage.setItem('nuar_invert_cam', cur ? '0' : '1');
+        this.hooks.onInvertCam && this.hooks.onInvertCam(!cur);
+        refreshInvertCam();
+      });
+      this._refreshInvertCam = refreshInvertCam;
+    }
+
+    // voice engine selector
+    const voiceEngineSelect = document.getElementById('voice-engine-select');
+    if (voiceEngineSelect) {
+      const savedEngine = localStorage.getItem('nuar_voice_engine') || 'auto';
+      voiceEngineSelect.value = savedEngine;
+      voiceEngineSelect.addEventListener('change', (e) => {
+        localStorage.setItem('nuar_voice_engine', e.target.value);
+        this.hooks.onVoiceEngineChange && this.hooks.onVoiceEngineChange(e.target.value);
+        this.refreshVoiceProfiles();
+      });
+    }
+
+    // voice profile selector
+    this.voiceProfileSelect = document.getElementById('voice-profile-select');
+    this.refreshVoiceProfiles();
+
     this.mapUI = new MapUI(document.getElementById('map-canvas'), document.getElementById('map-legend'));
+  }
+
+  refreshVoiceProfiles() {
+    if (!this.voiceProfileSelect) return;
+    const engine = localStorage.getItem('nuar_voice_engine') || 'auto';
+    const profiles = {
+      auto: ['Системный (авто)'],
+      edge: ['ru-RU-DmitryNeural', 'ru-RU-SvetlanaNeural'],
+      google: ['Google ru-RU'],
+      web: ['Web Speech (браузер)'],
+      synth: ['Локальный (espeak)']
+    };
+    const list = profiles[engine] || profiles.auto;
+    this.voiceProfileSelect.innerHTML = '';
+    list.forEach(p => {
+      const opt = document.createElement('option');
+      opt.value = p;
+      opt.textContent = p;
+      this.voiceProfileSelect.appendChild(opt);
+    });
+    const savedProfile = localStorage.getItem('nuar_voice_profile');
+    if (savedProfile && list.includes(savedProfile)) {
+      this.voiceProfileSelect.value = savedProfile;
+    }
+    this.voiceProfileSelect.addEventListener('change', (e) => {
+      localStorage.setItem('nuar_voice_profile', e.target.value);
+      this.hooks.onVoiceProfileChange && this.hooks.onVoiceProfileChange(e.target.value);
+    });
   }
 
   showTitle() { this.title.classList.remove('hidden'); this.credits.classList.add('hidden'); this.pause.classList.add('hidden'); this.settings.classList.add('hidden'); this.map.classList.add('hidden'); if (this._refreshSound) this._refreshSound(); if (this._refreshVoice) this._refreshVoice(); if (this._refreshTime) this._refreshTime(); this.refreshSave(); }
@@ -116,9 +176,11 @@ export class Screens {
     this.settings.classList.remove('hidden');
     const invertBtn = document.getElementById('btn-invert-joy');
     if (invertBtn) invertBtn.textContent = 'Инверсия джойстика: ' + (localStorage.getItem('nuar_invert_joy') === '1' ? 'вкл' : 'выкл');
+    if (this._refreshInvertCam) this._refreshInvertCam();
     if (this._refreshSound) this._refreshSound();
     if (this._refreshVoice) this._refreshVoice();
     if (this._refreshTime) this._refreshTime();
+    this.refreshVoiceProfiles();
   }
   hideSettings() { this.settings.classList.add('hidden'); }
   showMap() { this.map.classList.remove('hidden'); this.settings.classList.add('hidden'); }

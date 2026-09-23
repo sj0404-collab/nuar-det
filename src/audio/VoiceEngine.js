@@ -24,6 +24,7 @@ export class VoiceEngine {
     this._edgeWs = null;
     this._edgeTimer = null;
     this._source = null;
+    this.profile = localStorage.getItem('nuar_voice_profile') || '';
     this._tryLoadVoices();
   }
 
@@ -59,6 +60,22 @@ export class VoiceEngine {
   }
 
   toggle() { return this.setEnabled(!this.enabled); }
+
+  setMode(mode) {
+    const valid = ['auto', 'edge', 'web', 'synth', 'google'];
+    if (valid.includes(mode)) {
+      this.mode = mode;
+      localStorage.setItem('nuar_voice_engine', mode);
+      this.stop();
+    }
+  }
+
+  setProfile(profile) {
+    if (profile) {
+      this.profile = profile;
+      localStorage.setItem('nuar_voice_profile', profile);
+    }
+  }
 
   stop() {
     try { if (this.synth) this.synth.cancel(); } catch (e) {}
@@ -223,7 +240,7 @@ export class VoiceEngine {
     if (!this.synth || !this.voices.length) return null;
     const rus = this.voices.filter(v => /ru/i.test(v.lang || ''));
     const pool = rus.length ? rus : this.voices;
-    const mask = (profile.mask || '').toLowerCase().trim();
+    const mask = ((profile && profile.mask) || this.profile || '').toLowerCase().trim();
     if (mask) {
       for (const v of pool) {
         if (v.name.toLowerCase().includes(mask)) return v;

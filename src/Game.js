@@ -42,6 +42,11 @@ export class Game {
     this.clock = new THREE.Clock();
     this.audio = new AudioSys();
     this.voice = new VoiceEngine(this.audio);
+    // load voice settings
+    const savedEngine = localStorage.getItem('nuar_voice_engine') || 'auto';
+    const savedProfile = localStorage.getItem('nuar_voice_profile');
+    if (savedEngine) this.voice.setMode(savedEngine);
+    if (savedProfile) this.voice.setProfile(savedProfile);
     // суточный цикл привязан к реальному дню устройства (24 реальных часа)
     this.timeCycle = new TimeCycle();
     this.timeMode = localStorage.getItem('nuar_time_mode') || 'device'; // device | pause
@@ -68,7 +73,7 @@ export class Game {
     this.cameraYaw = Math.PI;
     this.cameraPitch = -0.12;
     this.cameraMode = 'orbit';
-    this.cameraMode = 'orbit'; // 'orbit' | 'fps' | 'top'
+    this.cameraInverted = localStorage.getItem('nuar_invert_cam') === '1';
 
     // UI
     this.hud = new HUD();
@@ -100,10 +105,13 @@ export class Game {
       onToTitle: () => this.toTitle(),
       onCamSens: (val) => this.touch.setCamSensitivity(val),
       onInvertJoy: (val) => this.touch.setInvertJoy(val),
+      onInvertCam: (val) => { this.cameraInverted = val; this.hud.toast('Инверсия камеры: ' + (val ? 'вкл' : 'выкл')); },
       onToggleSound: () => this.toggleSound(),
       getSoundMuted: () => this.audio.muted,
       onToggleVoice: () => this.toggleVoice(),
       getVoiceEnabled: () => this.voice.enabled,
+      onVoiceEngineChange: (engine) => this.voice.setMode(engine),
+      onVoiceProfileChange: (profile) => this.voice.setProfile(profile),
       onTimeSpeed: (mode) => this.setTimeMode(mode),
       getTimeMode: () => this.timeMode,
       hasSave: () => this.hasSave(),
@@ -1365,7 +1373,7 @@ this.player.grounded = true;
     }
 
     if (this.cameraMode === 'fps') {
-      const yawRate = -(keyCam * 2.7 + joyX * 2.7);
+      const yawRate = -(keyCam * 2.7 + joyX * 2.7) * (this.cameraInverted ? -1 : 1);
       if (yawRate !== 0) this.cameraYaw += yawRate * dt;
       if (joyY !== 0) {
         this.cameraPitch = Math.max(-1.2, Math.min(1.2, this.cameraPitch + joyY * 1.4 * dt));
@@ -1395,7 +1403,7 @@ this.player.grounded = true;
     }
 
     // ORBIT (default)
-    const yawRate = -(keyCam * 2.7 + joyX * 2.7);
+    const yawRate = -(keyCam * 2.7 + joyX * 2.7) * (this.cameraInverted ? -1 : 1);
     if (yawRate !== 0) this.cameraYaw += yawRate * dt;
 
     if (joyY !== 0) {
