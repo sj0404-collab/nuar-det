@@ -55,6 +55,8 @@ public class MainActivity extends Activity {
     private long lastDownloadId = -1;
     private boolean askedUpdate = false;
     private boolean isDownloading = false;
+    private boolean pageReady = false;
+    private String remoteVersion = "";
 
     private final BroadcastReceiver downloadReceiver = new BroadcastReceiver() {
         @Override
@@ -92,9 +94,15 @@ public class MainActivity extends Activity {
         requestWindowFeature(Window.FEATURE_NO_TITLE);
         getWindow().setFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON,
                 WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        // рисуем под вырезом/жестовой полосой, отступы учитывает CSS env(safe-area-inset-*)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            getWindow().getAttributes().layoutInDisplayCutoutMode =
+                    android.view.WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
+        }
         hideSystemUi();
 
         web = new WebView(this);
+        web.setBackgroundColor(0xFF05080D);
         WebSettings s = web.getSettings();
         s.setJavaScriptEnabled(true);
         s.setDomStorageEnabled(true);
@@ -103,6 +111,10 @@ public class MainActivity extends Activity {
         s.setMediaPlaybackRequiresUserGesture(false);
         s.setUseWideViewPort(true);
         s.setLoadWithOverviewMode(true);
+        s.setSupportZoom(false);
+        s.setBuiltInZoomControls(false);
+        s.setDisplayZoomControls(false);
+        s.setTextZoom(100);
         s.setCacheMode(WebSettings.LOAD_DEFAULT);
         CookieManager.getInstance().setAcceptCookie(true);
 
@@ -123,12 +135,19 @@ public class MainActivity extends Activity {
                 } catch (Throwable ignored) {}
                 return true;
             }
+
+            @Override
+            public void onPageFinished(WebView view, String url) {
+                pageReady = true;
+                // проверяем обновления только когда игра уже загрузилась и
+                // точно не блокируем титульный экран
+                maybeCheckForUpdate();
+            }
         });
 
         setContentView(web);
         web.loadUrl(GAME_URL);
         registerReceiver(downloadReceiver, new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE));
-        checkForUpdate();
     }
 
     @Override
@@ -173,7 +192,9 @@ public class MainActivity extends Activity {
 
     // ---------------- auto-update ----------------
 
-    private void checkForUpdate() {
+    /** Спрашивает про обновление, но только когда страница уже загружена. */
+    private void maybeCheckForUpdate() {
+        if (!pageReady || askedUpdate) return;
         new Thread(() -> {
             try {
                 String json = fetch(VERSION_URL);
@@ -182,9 +203,16 @@ public class MainActivity extends Activity {
                 String apkUrl = o.optString("apk", "");
                 String notes = o.optString("notes", "Доступно обновление.");
                 String local = BuildConfig.VERSION_NAME;
-                if (!remote.isEmpty() && isNewer(remote, local)) {
-                    runOnUiThread(() -> showUpdateDialog(apkUrl, notes));
-                }
+                if (remote.isEmpty() || !isNewer(remote, local)) return;
+
+                // не мучаем игрока одним и тем же предложением при каждом запуске
+                String shown = getSharedPreferences("nuar", MODE_PRIVATE).getString("update_prompted", "");
+                if (remote.equals(shown)) return;
+
+                runOnUiThread(() -> new Handler(Looper.getMainLooper()).postDelayed(() -> {
+                    if (askedUpdate) return;
+                    showUpdateDialog(apkUrl, notes, remote);
+                }, 4000));
             } catch (Throwable t) {
                 // offline / first run — молча пропускаем
             }
@@ -206,9 +234,10 @@ public class MainActivity extends Activity {
         return false;
     }
 
-    private void showUpdateDialog(String apkUrl, String notes) {
+    private void showUpdateDialog(String apkUrl, String notes, String version) {
         if (askedUpdate) return;
         askedUpdate = true;
+        getSharedPreferences("nuar", MODE_PRIVATE).edit().putString("update_prompted", version).apply();
         String base = GAME_URL;
         String fullUrl = apkUrl.startsWith("http") ? apkUrl : base.replaceAll("/+$", "") + "/" + apkUrl.replaceAll("^/+", "");
         new AlertDialog.Builder(this)
@@ -216,6 +245,7 @@ public class MainActivity extends Activity {
                 .setMessage(notes + "\n\nСкачать новую версию Нуар-Дет?")
                 .setPositiveButton("Обновить", (d, w) -> downloadApk(fullUrl))
                 .setNegativeButton("Позже", (d, w) -> {})
+                .setOnCancelListener(d -> {})
                 .show();
     }
 

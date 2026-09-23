@@ -45,6 +45,14 @@
           <div id="minimap-compass">N</div>
         </div>
 
+        <div id="tutorial-tip" class="hidden">
+          <div class="tut-head">
+            <span id="tutorial-title">Подсказка</span>
+            <button id="tutorial-skip" class="tut-skip" aria-label="Пропустить обучение">✕</button>
+          </div>
+          <div id="tutorial-text"></div>
+        </div>
+
         <div id="bottom-bar">
           <div id="touch-controls" class="hidden">
             <div id="joy-zone"><div id="joy-base"><div id="joy-thumb"></div></div></div>
@@ -111,6 +119,7 @@
           <button id="btn-time-speed" class="menu-btn">Время суток: устройство</button>
           <button id="btn-save" class="menu-btn">Сохранить игру</button>
           <button id="btn-map-full" class="menu-btn">Карта города</button>
+          <button id="btn-tutorial-reset" class="menu-btn">Пройти обучение заново</button>
           <button id="btn-to-title" class="menu-btn">В титул</button>
         </div>
       </div>
@@ -141,6 +150,7 @@
           <div class="setting-row">
             <label>Голос (профиль)</label>
             <select id="voice-profile-select"></select>
+            <button id="btn-voice-preview" class="menu-btn small">Прослушать пример</button>
           </div>
           <button id="btn-settings-back" class="menu-btn">Назад</button>
         </div>

@@ -1,5 +1,12 @@
 apply plugin: 'com.android.application'
 
+// Версия APK берётся из version.json в корне репозитория — единый источник
+// правды, иначе оболочка вечно предлагает «обновление» на ту же самую версию.
+def verFile = rootProject.file('../version.json')
+def verJson = new groovy.json.JsonSlurper().parseText(verFile.text)
+def verName = verJson.version.toString()
+def verCode = verName.split('\\.').collect { it.toInteger() }.inject(1) { a, b -> a * 1000 + b }
+
 android {
     namespace 'com.nuardet.game'
     compileSdk 36
@@ -8,8 +15,8 @@ android {
         applicationId "com.nuardet.game"
         minSdk 24
         targetSdk 36
-        versionCode 4
-        versionName "1.2.1"
+        versionCode verCode
+        versionName verName
     }
 
     signingConfigs {

@@ -10,6 +10,8 @@ export class CombatUI {
     this.hand = document.getElementById('hand');
     this.turnIndicator = document.getElementById('turn-indicator');
     this.hooks = hooks;
+    this.updateFanTilt();
+    window.addEventListener('resize', () => this.updateFanTilt());
     this.active = false;
     this.cardEls = [];
 
@@ -59,6 +61,11 @@ export class CombatUI {
     this.hideResult();
   }
 
+  updateFanTilt() {
+    // на узких экранах карты не разворачиваем, чтобы рука помещалась в экран
+    this.fanTilt = window.innerWidth >= 560;
+  }
+
   render(combat, state) {
     const e = combat.enemy;
     const pct = Math.max(0, Math.round(e.hp / e.maxHp * 100));
@@ -104,10 +111,16 @@ export class CombatUI {
         ev.stopPropagation();
         this.hooks.onPlay && this.hooks.onPlay(i);
       });
-      // tilt fan
+      // веер: на узких экранах разворот убираем, иначе крайние карты
+      // вылезают за границы экрана
       const mid = (combat.hand.length - 1) / 2;
       const rot = (i - mid) * 4.5;
-      div.style.transform = `translateY(${Math.abs(i - mid) * 6}px) rotate(${rot}deg)`;
+      const spread = Math.abs(i - mid) * 6;
+      if (this.fanTilt) {
+        div.style.transform = `translateY(${spread}px) rotate(${rot}deg)`;
+      } else {
+        div.style.transform = 'none';
+      }
       div.setAttribute('data-i', i);
       this.hand.appendChild(div);
       this.cardEls.push(div);

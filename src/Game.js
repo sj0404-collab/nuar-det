@@ -23,6 +23,7 @@ import { GlowSprites } from './render/GlowSprites.js';
 import { HoloArena } from './render/HoloArena.js';
 import { buildPedestrians, updatePedestrians } from './world/Pedestrians.js';
 import { Minimap } from './ui/Minimap.js';
+import { Tutorial } from './ui/Tutorial.js';
 
 const ABILITY_KEYS = { dash: 'dash', jump: 'jump', wall: 'wall', lens: 'lens' };
 
@@ -72,7 +73,8 @@ export class Game {
     // camera orbit state
     this.cameraYaw = Math.PI;
     this.cameraPitch = -0.12;
-    this.cameraMode = 'orbit';
+    const savedCamMode = localStorage.getItem('nuar_cam_mode');
+    this.cameraMode = (savedCamMode === 'fps' || savedCamMode === 'top') ? savedCamMode : 'orbit';
     this.cameraInverted = localStorage.getItem('nuar_invert_cam') === '1';
 
     // UI
@@ -95,6 +97,7 @@ export class Game {
     });
     this.holo = new HoloArena();
     this.minimap = new Minimap(this);
+    this.tutorial = new Tutorial(this);
     this.screens = new Screens({
       onStart: () => this.newGame(),
       onContinue: () => this.continueGame(),
@@ -112,6 +115,7 @@ export class Game {
       getVoiceEnabled: () => this.voice.enabled,
       onVoiceEngineChange: (engine) => this.voice.setMode(engine),
       onVoiceProfileChange: (profile) => this.voice.setProfile(profile),
+      onVoicePreview: () => this.previewVoice(),
       onTimeSpeed: (mode) => this.setTimeMode(mode),
       getTimeMode: () => this.timeMode,
       hasSave: () => this.hasSave(),
@@ -169,6 +173,16 @@ export class Game {
     document.getElementById('btn-ending-play').addEventListener('click', () => this.newGame());
     document.getElementById('btn-seat-driver').addEventListener('click', () => this.confirmBoard(true));
     document.getElementById('btn-seat-passenger').addEventListener('click', () => this.confirmBoard(false));
+    const tutSkip = document.getElementById('tutorial-skip');
+    if (tutSkip) tutSkip.addEventListener('click', () => this.tutorial.skip());
+    const tutReset = document.getElementById('btn-tutorial-reset');
+    if (tutReset) {
+      tutReset.addEventListener('click', () => {
+        this.tutorial.reset();
+        this.resumeFromPause();
+        this.hud.toast('Обучение запущено заново.');
+      });
+    }
     this.touch.setInteract(() => this.tryInteract());
   }
 
@@ -690,6 +704,17 @@ export class Game {
     return sprite;
   }
 
+  previewVoice() {
+    // превью не должно включать выключенную озвучку — пользователь явно
+    // нажал «прослушать», значит озвучка ему нужна
+    const wasEnabled = this.voice.enabled;
+    this.voice.setEnabled(true);
+    this.voice.speak('Туман красив, но улицы помнят всё.', { mask: this.voice.profile || '', rate: 0.95, pitch: 1 });
+    if (!wasEnabled) {
+      setTimeout(() => { if (!this.voice.speaking) this.voice.setEnabled(false); }, 1200);
+    }
+  }
+
   // ---------- game flow ----------
   startGame() {
     this.audio.init();
@@ -774,6 +799,7 @@ export class Game {
         bossDefeated: !!this.bossDefeated,
       };
       localStorage.setItem('nuar_save_v1', JSON.stringify(data));
+      if (this.tutorial) this.tutorial.marksSwitches.save = true;
     } catch (e) { /* storage unavailable/full */ }
   }
 
@@ -928,6 +954,7 @@ export class Game {
   }
 
   onDialogueChoose(i) {
+    if (this.tutorial) this.tutorial.marksSwitches.dialogue = true;
     this.dialogue.choose(i);
     if (this.dialogue.active) {
       this.dialogueUI.render(this.dialogue);
@@ -981,7 +1008,12 @@ export class Game {
   tryInteract() {
     if (this.mode !== 'explore') return;
     const p = this.player.pos;
-    if (this.mount) { this.dismount(true); return; }
+    if (this.mount) {
+      // в фиакре F пересаживает между местами, в остальном транспорте — выход
+      if (this.mount.veh.cab) this.swapSeat();
+      else this.dismount(true);
+      return;
+    }
     // NPC
     for (const n of this.world.npcs) {
       const dx = p.x - n.pos.x, dz = p.z - n.pos.z;
@@ -1073,18 +1105,41 @@ export class Game {
 
   board(v) {
     this.pendingVehicle = v;
+    const canDrive = !!v.cab;
+    // у трамвая/автобуса водителя нет — предлагаем только пассажира
+    document.getElementById('btn-seat-driver').classList.toggle('hidden', !canDrive);
     document.getElementById('seat-choice').classList.remove('hidden');
     this.audio.sfx('chest');
+  }
+
+  // пересадка места на ходу: F в машине меняет водитель/пассажир
+  swapSeat() {
+    const m = this.mount;
+    if (!m || !m.veh.cab) return;
+    const asDriver = !m.driver;
+    m.veh.playerDriven = asDriver;
+    if (asDriver && m.veh.baseSpeed === undefined) m.veh.baseSpeed = m.veh.speed;
+    if (!asDriver && m.veh.baseSpeed !== undefined) m.veh.speed = m.veh.baseSpeed;
+    m.driver = asDriver;
+    m.seatOffset = asDriver ? 0 : 0.7;
+    this.hud.toast(asDriver ? 'Вы пересели за руль. W/S — газ, A/D — поворот.' : 'Вы пересели на пассажирское место.');
+    this.audio.sfx('ui');
   }
 
   confirmBoard(asDriver) {
     const v = this.pendingVehicle;
     if (!v) return;
+    if (this.tutorial) this.tutorial.marksSwitches.transport = true;
     this.pendingVehicle = null;
     document.getElementById('seat-choice').classList.add('hidden');
     const seatY = v.cab ? 1.15 : v.tram ? 0.7 : 0.95;
     if (asDriver && v.baseSpeed === undefined) v.baseSpeed = v.speed;
-    this.mount = { veh: v, seat: new THREE.Vector3(0, seatY, 0), driver: asDriver };
+    this.mount = {
+      veh: v,
+      seat: new THREE.Vector3(0, seatY, 0),
+      driver: asDriver,
+      seatOffset: asDriver ? 0 : 0.7,
+    };
     this.hud.toast(asDriver
       ? 'Вы за рулём! W/S — газ и тормоз, A/D — поворот, выход — F или пробел.'
       : 'Вы пассажир. Транспорт едет по маршруту, выход — F или пробел.');
@@ -1110,11 +1165,17 @@ export class Game {
     this.player.facing.set(ox || 1, 0, oz || 0).normalize();
   }
 
-updateMount(dt, t) {
+  updateMount(dt, t) {
     const v = this.mount.veh;
     const m = v.mesh;
     const s = this.mount.seat;
-    this.player.pos.set(m.position.x + s.x, m.position.y + s.y, m.position.z + s.z);
+    // пассажир сидит сбоку от водителя — иначе он рисуется на месте водителя
+    const lateral = (this.mount.seatOffset || 0) * (v.axis === 'z' ? 1 : 0);
+    this.player.pos.set(
+      m.position.x + s.x + (v.axis === 'z' ? lateral : 0),
+      m.position.y + s.y,
+      m.position.z + s.z + (v.axis === 'x' ? lateral : 0)
+    );
 
     if (this.mount.driver && v.cab) {
       // водитель: газ по axis2D, поворот по axis.x
@@ -1149,6 +1210,7 @@ updateMount(dt, t) {
     this.state.hp = this.player.hp;
     this.state.maxHp = this.player.maxHp;
     this.mode = 'combat';
+    document.body.classList.add('in-combat');
     this.combat = new Combat(this.state);
     this.combat.startCombat(enemyId);
     this.activeWisp = wisp;
@@ -1177,6 +1239,7 @@ updateMount(dt, t) {
 
   onCombatFlee() {
     if (!this.combat || this.combat.over) return;
+    if (this.tutorial) this.tutorial.marksSwitches.flee = true;
     this.combat.retreat(); // just logs
     this.state.hp = Math.max(1, this.state.hp - 10);
     this.player.hp = this.state.hp;
@@ -1224,6 +1287,7 @@ updateMount(dt, t) {
   }
 
   endCombatCleanup() {
+    document.body.classList.remove('in-combat');
     this.combatUI.close();
     this.combat = null;
     this.mode = 'explore';
@@ -1374,6 +1438,7 @@ updateMount(dt, t) {
     }
     this.animateProps(dt);
     this.updateAmbience(dt);
+    this.tutorial.update();
   }
 
   // location-based ambience crossfade + altitude-scaled wind
@@ -1407,7 +1472,9 @@ updateMount(dt, t) {
       const modes = ['orbit', 'fps', 'top'];
       const idx = modes.indexOf(this.cameraMode);
       this.cameraMode = modes[(idx + 1) % modes.length];
+      localStorage.setItem('nuar_cam_mode', this.cameraMode);
       this.hud.toast(`Камера: ${this.cameraMode === 'orbit' ? 'Обзор' : this.cameraMode === 'fps' ? 'От 1-го лица' : 'Вид сверху'}`);
+      if (this.tutorial) this.tutorial.marksSwitches.camera = true;
     }
 
     if (this.cameraMode === 'fps') {
@@ -1471,7 +1538,9 @@ updateMount(dt, t) {
     const p = this.player.pos;
     let near = null;
     if (this.mount) {
-      near = { text: 'Выйти из транспорта — F или пробел', interact: true };
+      near = { text: this.mount.veh.cab
+        ? (this.mount.driver ? 'За рулём: W/S газ, A/D поворот · F — пересесть, пробел — выйти' : 'Пассажир: F — пересесть за руль, пробел — выйти')
+        : 'Выйти из транспорта — F или пробел', interact: true };
     } else {
       for (const n of this.world.npcs) {
         const dx = p.x - n.pos.x, dz = p.z - n.pos.z;
@@ -1513,8 +1582,10 @@ updateMount(dt, t) {
         if (!z.visited) {
           z.visited = true;
           this.hud.toast(`◆ ${z.label}`);
-          // checkpoint at zone center
-          this.checkpoint = { x: (z.minX + z.maxX) / 2, y: Math.max(1.2, z.minY + 0.8), z: (z.minZ + z.maxZ) / 2 };
+          // чекпоинт — точка входа в зону, а не её центр:
+          // центр может оказаться внутри стены, и возрождение выкинет игрока
+          // в геометрию или в пропасть
+          this.checkpoint = { x: p.x, y: Math.max(1.2, p.y), z: p.z };
           this.autosave();
         }
       }
@@ -1529,7 +1600,8 @@ updateMount(dt, t) {
         this.audio.sfx('dash');
         this.player.pos.set(tr.toX, tr.toY, tr.toZ);
         this.player.vel.set(0, 0, 0);
-        if (tr.take === 'up') this.checkpoint = { x: 130, y: 1.2, z: 40 };
+        // чекпоинт ставим в точку прибытия — она гарантированно «на земле»
+        if (tr.take) this.checkpoint = { x: tr.toX, y: Math.max(1.2, tr.toY), z: tr.toZ };
         if (tr.take) this.autosave();
         this.hud.toast(tr.take === 'down' ? 'Спуск в цистерну' : 'Подъём на рынок');
         return;

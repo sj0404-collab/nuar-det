@@ -133,6 +133,11 @@ export class Screens {
     this.voiceProfileSelect = document.getElementById('voice-profile-select');
     this.refreshVoiceProfiles();
 
+    const previewBtn = document.getElementById('btn-voice-preview');
+    if (previewBtn) {
+      previewBtn.addEventListener('click', () => this.hooks.onVoicePreview && this.hooks.onVoicePreview());
+    }
+
     this.mapUI = new MapUI(document.getElementById('map-canvas'), document.getElementById('map-legend'));
   }
 
