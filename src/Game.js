@@ -1296,7 +1296,9 @@ this.player.grounded = true;
     const joyY = this.input.camJoyY;
     const keyCam = this.input.camHeld; // keyboard Q/E (-1/0/+1)
 
-    const yawRate = keyCam * 2.7 + joyX * 2.7;
+    // yaw input is inverted so that E / right-stick-right turns the view right
+    // (verified: +yaw currently drifts the world to the right on screen)
+    const yawRate = -(keyCam * 2.7 + joyX * 2.7);
     if (yawRate !== 0) this.cameraYaw += yawRate * dt;
 
     if (joyY !== 0) {
