@@ -36,11 +36,30 @@ canvas#game-canvas { position: absolute; inset: 0; width: 100%; height: 100%; di
 }
 
 #top-bar { position: absolute; top: calc(8px + env(safe-area-inset-top)); left: 0; right: 0; display: flex; justify-content: space-between; align-items: center; padding: 0 14px; }
+#left-panel { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
 #case-label {
   font-size: 13px; letter-spacing: 2px; text-transform: uppercase; color: var(--gold);
   background: rgba(5,8,12,0.6); border: 1px solid rgba(212,165,89,0.35);
   padding: 6px 12px; border-radius: 4px; backdrop-filter: blur(4px);
 }
+#hud-clock {
+  display: flex; align-items: center; gap: 7px;
+  background: rgba(5,8,12,0.6); border: 1px solid rgba(212,165,89,0.35);
+  border-radius: 22px; padding: 3px 10px 3px 3px; backdrop-filter: blur(4px);
+}
+.clock-dial {
+  position: relative; width: 38px; height: 38px; border-radius: 50%;
+  background: radial-gradient(circle at 50% 32%, #18222e, #0a0f16 75%);
+  border: 1px solid rgba(212,165,89,0.55); box-shadow: inset 0 0 8px rgba(0,0,0,0.7);
+  background-image: repeating-conic-gradient(rgba(233,220,192,0.5) 0deg 1.5deg, transparent 1.5deg 30deg);
+}
+.hand { position: absolute; left: 50%; bottom: 50%; transform-origin: 50% 100%; border-radius: 2px; }
+#clock-hour { width: 3px; height: 10px; margin-left: -1.5px; background: #e9dcc0; z-index: 1; }
+#clock-minute { width: 2px; height: 13px; margin-left: -1px; background: #d4a559; z-index: 1; }
+#clock-second { width: 1px; height: 16px; margin-left: -0.5px; background: #b0342e; z-index: 1; }
+#clock-cap { position: absolute; left: 50%; top: 50%; width: 4px; height: 4px; margin: -2px 0 0 -2px; border-radius: 50%; background: #b0342e; z-index: 2; }
+#clock-digital { font-size: 11px; letter-spacing: 1px; color: var(--parch); font-variant-numeric: tabular-nums; min-width: 54px; }
+#clock-icon { font-size: 14px; }
 #logs { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; justify-content: center; }
 .log-chip {
   font-size: 11px; color: var(--mint); background: rgba(5,10,14,0.55);

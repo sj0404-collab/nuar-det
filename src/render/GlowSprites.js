@@ -47,14 +47,15 @@ export class GlowSprites {
     }
   }
 
-  update(t) {
+  update(t, dayFactor = 0) {
+    const night = 1 - dayFactor; // 1 at night, 0 at noon
     for (const g of this.sprites) {
       const flicker = 0.5 + 0.5 * Math.sin(t * g.speed + g.phase);
       const gust = Math.sin(t * g.speed * 0.37 + g.phase * 1.7);
-      g.halo.material.opacity = 0.55 + flicker * 0.22 + gust * 0.1;
+      g.halo.material.opacity = (0.55 + flicker * 0.22 + gust * 0.1) * (0.15 + night * 0.85);
       const s = g.base * (1 + flicker * 0.12);
       g.halo.scale.set(s, s, 1);
-      g.ground.material.opacity = 0.22 + flicker * 0.16;
+      g.ground.material.opacity = (0.22 + flicker * 0.16) * (0.2 + night * 0.8);
     }
   }
 }

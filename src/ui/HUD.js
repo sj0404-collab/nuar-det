@@ -8,6 +8,27 @@ export class HUD {
     this.touch = null;
     this.toastTimer = null;
     this.hintTimer = null;
+    this.hourHand = document.getElementById('clock-hour');
+    this.minuteHand = document.getElementById('clock-minute');
+    this.secondHand = document.getElementById('clock-second');
+    this.clockDigital = document.getElementById('clock-digital');
+    this.clockIcon = document.getElementById('clock-icon');
+  }
+
+  setClock(h, m, s, dayFactor) {
+    if (!this.hourHand) return;
+    const sd = s * 6;
+    const md = m * 6 + s * 0.1;
+    const hd = (h % 12) * 30 + m * 0.5 + s * (0.5 / 60);
+    this.secondHand.style.transform = `rotate(${sd}deg)`;
+    this.minuteHand.style.transform = `rotate(${md}deg)`;
+    this.hourHand.style.transform = `rotate(${hd}deg)`;
+    this.clockDigital.textContent =
+      `${('0' + h).slice(-2)}:${('0' + m).slice(-2)}:${('0' + s).slice(-2)}`;
+    if (this.clockIcon) {
+      this.clockIcon.textContent = dayFactor > 0.85 ? '☀️'
+        : dayFactor > 0.45 ? '🌇' : '🌙';
+    }
   }
 
   setTouch(tc) { this.touch = tc; }

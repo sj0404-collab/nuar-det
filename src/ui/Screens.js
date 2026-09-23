@@ -71,13 +71,31 @@ export class Screens {
       });
     }
 
+    // время суток: синхрон с устройством ⇄ остановка
+    const timeBtn = document.getElementById('btn-time-speed');
+    if (timeBtn) {
+      const cycle = ['device', 'pause'];
+      const labels = { device: 'устройство', pause: 'стоп' };
+      const refreshTime = () => {
+        const cur = this.hooks.getTimeMode ? this.hooks.getTimeMode() : 'device';
+        timeBtn.textContent = 'Время суток: ' + (labels[cur] || 'устройство');
+      };
+      timeBtn.addEventListener('click', () => {
+        const cur = this.hooks.getTimeMode ? this.hooks.getTimeMode() : 'device';
+        const next = cycle[(cycle.indexOf(cur) + 1) % cycle.length];
+        if (this.hooks.onTimeSpeed) this.hooks.onTimeSpeed(next);
+        refreshTime();
+      });
+      this._refreshTime = refreshTime;
+    }
+
     this.mapUI = new MapUI(document.getElementById('map-canvas'), document.getElementById('map-legend'));
   }
 
-  showTitle() { this.title.classList.remove('hidden'); this.credits.classList.add('hidden'); this.pause.classList.add('hidden'); this.settings.classList.add('hidden'); this.map.classList.add('hidden'); if (this._refreshSound) this._refreshSound(); }
+  showTitle() { this.title.classList.remove('hidden'); this.credits.classList.add('hidden'); this.pause.classList.add('hidden'); this.settings.classList.add('hidden'); this.map.classList.add('hidden'); if (this._refreshSound) this._refreshSound(); if (this._refreshTime) this._refreshTime(); }
   showCredits() { this.credits.classList.remove('hidden'); this.title.classList.remove('hidden'); }
   hideTitle() { this.title.classList.add('hidden'); }
-  showPause() { this.pause.classList.remove('hidden'); this.settings.classList.add('hidden'); }
+  showPause() { this.pause.classList.remove('hidden'); this.settings.classList.add('hidden'); if (this._refreshTime) this._refreshTime(); }
   hidePause() { this.pause.classList.add('hidden'); }
   showSettings() {
     this.title.classList.add('hidden');
@@ -87,6 +105,7 @@ export class Screens {
     const invertBtn = document.getElementById('btn-invert-joy');
     if (invertBtn) invertBtn.textContent = 'Инверсия джойстика: ' + (localStorage.getItem('nuar_invert_joy') === '1' ? 'вкл' : 'выкл');
     if (this._refreshSound) this._refreshSound();
+    if (this._refreshTime) this._refreshTime();
   }
   hideSettings() { this.settings.classList.add('hidden'); }
   showMap() { this.map.classList.remove('hidden'); this.settings.classList.add('hidden'); }

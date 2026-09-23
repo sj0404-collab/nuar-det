@@ -247,16 +247,20 @@ export class World {
       const s = new THREE.Sprite(smat.clone());
       const scale = 20 + Math.random() * 38;
       s.scale.set(scale, scale * (0.32 + Math.random() * 0.18), 1);
-      s.material.opacity = 0.4 + Math.random() * 0.3;
+      const op = 0.4 + Math.random() * 0.3;
+      s.material.opacity = op;
       s.position.set(x, 0.8 + Math.random() * 1.6, z);
       this.scene.add(s);
-      this.fogSprites.push({ s, base: 0.8 + Math.random() * 1.6, speed: 0.18 + Math.random() * 0.4, phase: Math.random() * 10 });
+      this.fogSprites.push({ s, base: 0.8 + Math.random() * 1.6, speed: 0.18 + Math.random() * 0.4, phase: Math.random() * 10, op });
     }
   }
 
-  updateFog(time) {
+  updateFog(time, dayFactor = 0) {
+    const night = 1 - dayFactor;
     for (const f of this.fogSprites) {
       f.s.position.y = f.base + Math.sin(time * f.speed + f.phase) * 0.7;
+      // denser, colder night fog; lighter drier air by day
+      f.s.material.opacity = Math.max(0.05, f.op * (0.35 + night * 0.85));
     }
   }
 

@@ -21,6 +21,16 @@
         <div id="top-bar">
           <div id="left-panel">
             <div id="case-label">Дело №0</div>
+            <div id="hud-clock" title="Время Ноктиса">
+              <div class="clock-dial">
+                <div id="clock-hour" class="hand"></div>
+                <div id="clock-minute" class="hand"></div>
+                <div id="clock-second" class="hand"></div>
+                <div id="clock-cap"></div>
+              </div>
+              <div id="clock-digital">22:00</div>
+              <div id="clock-icon">🌙</div>
+            </div>
           </div>
           <div id="logs"></div>
           <div id="abilities"></div>
@@ -91,6 +101,7 @@
             <label>Чувствительность камеры</label>
             <input id="cam-sens-slider" type="range" min="0.2" max="3" step="0.1" value="1">
           </div>
+          <button id="btn-time-speed" class="menu-btn">Время суток: устройство</button>
           <button id="btn-map-full" class="menu-btn">Карта города</button>
           <button id="btn-to-title" class="menu-btn">В титул</button>
         </div>

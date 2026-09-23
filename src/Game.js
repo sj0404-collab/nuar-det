@@ -4,6 +4,7 @@ import { Player } from './player/Player.js';
 import { SkyDome } from './render/SkyDome.js';
 import { Input } from './core/Input.js';
 import { TouchControls } from './core/TouchControls.js';
+import { TimeCycle } from './core/TimeCycle.js';
 import { HUD } from './ui/HUD.js';
 import { Screens } from './ui/Screens.js';
 import { DialogueUI } from './ui/DialogueUI.js';
@@ -35,6 +36,13 @@ export class Game {
 
     this.clock = new THREE.Clock();
     this.audio = new AudioSys();
+    // суточный цикл привязан к реальному дню устройства (24 реальных часа)
+    this.timeCycle = new TimeCycle();
+    this.timeMode = localStorage.getItem('nuar_time_mode') || 'device'; // device | pause
+    this._lastDayFactor = -1;
+    // fog day/night palettes
+    this.fogNight = new THREE.Color(0x0f1a2c);
+    this.fogDay = new THREE.Color(0x9fb8cc);
 
     this.world = new World(this.scene);
     // install room builder
@@ -77,6 +85,8 @@ export class Game {
       onInvertJoy: (val) => this.touch.setInvertJoy(val),
       onToggleSound: () => this.toggleSound(),
       getSoundMuted: () => this.audio.muted,
+      onTimeSpeed: (mode) => this.setTimeMode(mode),
+      getTimeMode: () => this.timeMode,
     });
     this.screens.showTitle();
 
@@ -661,6 +671,27 @@ export class Game {
     this.audio.toggleMute();
   }
 
+  setTimeMode(mode) {
+    this.timeMode = mode;
+    localStorage.setItem('nuar_time_mode', mode);
+  }
+
+  // множитель скорости времени: устройство-режим синхронизирован всегда,
+  // единственный тумблер — «остановка времени» (полезно в найт-сценах)
+  getTimeScale() {
+    if (this.mode === 'pause' || this.timeMode === 'pause') return 0;
+    return 1;
+  }
+
+  applyDayNight(dayFactor) {
+    if (Math.abs(dayFactor - this._lastDayFactor) < 0.002) return;
+    this._lastDayFactor = dayFactor;
+    // туман мира: ночью тёмный нуар, днём — светлая дымка
+    if (this.scene.fog) {
+      this.scene.fog.color.copy(this.fogNight).lerp(this.fogDay, dayFactor);
+    }
+  }
+
   resumeFromPause() {
     if (this.mode === 'pause' || this.mode === 'map') {
       this.mode = 'explore';
@@ -924,10 +955,18 @@ export class Game {
 
   update(dt) {
     const t = this.clock.elapsedTime;
-    this.sky.update(t);
-    this.world.updateFog(t);
+    // суточный цикл
+    const timeScale = this.getTimeScale();
+    if (timeScale > 0) this.timeCycle.update(dt * timeScale);
+    const dayFactor = this.timeCycle.dayFactorF || 0;
+    this.sky.update(t, dayFactor);
+    this.applyDayNight(dayFactor);
+    this.world.updateFog(t, dayFactor);
     this.effects.update(dt, t, this.camera.position);
-    this.glow.update(t);
+    this.glow.update(t, dayFactor);
+    this.hud.setClock(
+      this.timeCycle.hour, this.timeCycle.minute, this.timeCycle.second, dayFactor
+    );
     this.effects.rain.points.visible = this.player.pos.y > -5;
 
     if (this.mode === 'ending') {
