@@ -13,6 +13,18 @@
   <div id="app">
     <canvas id="game-canvas"></canvas>
 
+    <!-- Кинематографичная заставка -->
+    <div id="intro-overlay" class="hidden">
+      <div id="intro-bar-top"></div>
+      <div id="intro-bar-bottom"></div>
+      <div id="intro-center">
+        <div id="intro-title"></div>
+        <div id="intro-sub"></div>
+      </div>
+      <div id="intro-cap"></div>
+      <div id="intro-skip">Пропустить — клик, пробел или Esc</div>
+    </div>
+
     <!-- HUD -->
     <div id="hud" class="hidden">
       <div id="vignette"></div>
@@ -93,6 +105,7 @@
           <p id="save-status"></p>
           <button id="btn-start" class="menu-btn primary">Начать расследование</button>
           <button id="btn-explore" class="menu-btn">Исследовать город</button>
+          <button id="btn-intro" class="menu-btn">Заставка Ноктиса</button>
           <button id="btn-credits" class="menu-btn">Как играть</button>
           <button id="btn-title-settings" class="menu-btn">Настройки</button>
         </div>
@@ -130,6 +143,7 @@
           <button id="btn-time-speed" class="menu-btn">Время суток: устройство</button>
           <button id="btn-save" class="menu-btn">Сохранить игру</button>
           <button id="btn-map-full" class="menu-btn">Карта города</button>
+          <button id="btn-intro-pause" class="menu-btn">Заставка Ноктиса</button>
           <button id="btn-tutorial-reset" class="menu-btn">Пройти обучение заново</button>
           <button id="btn-to-title" class="menu-btn">В титул</button>
         </div>

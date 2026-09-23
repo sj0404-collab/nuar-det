@@ -17,6 +17,8 @@ import { AudioSys } from './audio/AudioSys.js';
 import { VoiceEngine } from './audio/VoiceEngine.js';
 import { voiceFor } from './story/profiles.js';
 import { PERSONAS, loadPersona, savePersona, personaById } from './story/personas.js';
+import { Cinematic } from './ui/Cinematic.js';
+import { WORLD_INTRO, NARRATOR_PROFILE, personaIntroFor } from './story/intro.js';
 import { makePainterlyMaterial, addInkOutline, flatGeometry } from './render/Painterly.js';
 import { buildAnimeEyes, buildAnimeHair, buildAnimeMouth, makeToon } from './render/AnimeFigure.js';
 import { Effects } from './render/Particles.js';
@@ -113,6 +115,8 @@ export class Game {
       onMap: () => this.toggleMap(),
       onInventory: () => this.toggleInventory(),
       onCameraMode: (mode) => this.setCameraMode(mode),
+      onWorldIntro: () => this.playWorldIntro(),
+      onPersonaIntro: (p) => this.playPersonaIntro(p),
       getInventory: () => this.inventoryData(),
       onToTitle: () => this.toTitle(),
       onCamSens: (val) => this.touch.setCamSensitivity(val),
@@ -138,6 +142,10 @@ export class Game {
     });
     this.screens.showTitle();
     this.screens.setCameraMode(this.cameraMode);
+
+    // кинематографичные заставки: мир и выбранный протагонист
+    this.cinematic = new Cinematic(this);
+    this.cinematic.setNarrator(NARRATOR_PROFILE);
 
     // state
     this.mode = 'title';
@@ -1005,7 +1013,7 @@ export class Game {
   }
 
   resumeFromPause() {
-    if (this.mode === 'pause' || this.mode === 'map' || this.mode === 'inventory') {
+    if (this.mode === 'pause' || this.mode === 'map' || this.mode === 'inventory' || this.mode === 'explore') {
       this.mode = 'explore';
       this.screens.hidePause();
       this.screens.hideMap();
@@ -1040,6 +1048,43 @@ export class Game {
       this.screens.hidePause();
       this.touch.enable();
     }
+  }
+
+  // ---------- заставки ----------
+  playWorldIntro(after) {
+    if (this.cinematic.playing) return;
+    this.audio.init();
+    this.audio.resume();
+    const wasMode = this.mode;
+    this.mode = 'intro';
+    this.screens.hideTitle();
+    this.screens.hidePause();
+    this.screens.hideInventory();
+    this.touch.disable();
+    this.cinematic.play(WORLD_INTRO, () => {
+      // восстанавливаем режим, из которого заставка была запущена
+      this.mode = wasMode;
+      if (after) { after(); return; }
+      if (wasMode === 'title') this.toTitle();
+      else this.resumeFromPause();
+    });
+  }
+
+  playPersonaIntro(p, after) {
+    if (this.cinematic.playing) return;
+    this.audio.init();
+    this.audio.resume();
+    const persona = p || this.persona;
+    this.persona = persona;
+    if (this.player && persona.body) this.player.applyBody(persona.body);
+    this.mode = 'intro';
+    this.screens.hideTitle();
+    this.touch.disable();
+    this.cinematic.play(personaIntroFor(persona), () => {
+      this.mode = 'title';
+      if (after) after();
+      else this.toTitle();
+    });
   }
 
   setCameraMode(mode) {
@@ -1550,6 +1595,12 @@ export class Game {
 
     if (this.mode === 'ending') {
       this.driftCamera(dt);
+      return;
+    }
+
+    if (this.mode === 'intro') {
+      this.cinematic.update(dt);
+      this.animateProps(dt);
       return;
     }
 
