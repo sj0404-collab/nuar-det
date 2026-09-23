@@ -1,5 +1,22 @@
 import { COLORS } from './World.js';
 
+// --- noir-era facade detailing ---
+const D_BASE = 0x1c232b;      // stone plinth
+const D_COURSE = 0x2a323c;    // string course / floor band
+const D_GLASS = 0x2b3640;     // night-reflecting glass
+const D_FRAME = 0x14191f;     // window frame charcoal
+const D_SILL = 0x2c343e;      // window sill ledge
+const D_IRON = 0x12151a;      // fire-escape iron
+const D_LIT = 0xffd98a;       // warm lit window
+const D_LIT2 = 0xfff0c0;
+
+function lcg(seed) {
+  return function () {
+    seed = (seed * 1103515245 + 12345) % 2147483648;
+    return seed / 2147483648;
+  };
+}
+
 // ground slab: top surface at yTop
 export function pave(r, pal, x1, x2, z1, z2, yTop = 0) {
   const x = (x1 + x2) / 2, z = (z1 + z2) / 2;
@@ -22,55 +39,114 @@ export function grate(r, color, x, z) {
   return r;
 }
 
-// facade wall with framed windows + sills on the +z face
-export function windowWall(r, pal, cx, cy, cz, w, h, d, cols = 4, rows = 3) {
+// full facade: plinth, floor string-courses, wrapped window curtain on all
+// four faces, entrance with canopy light, optional awning / fire escape
+export function windowWall(r, pal, cx, cy, cz, w, h, d, cols = 3, rows = 2, opts = {}) {
   r.box(pal.wall, cx, cy + h / 2, cz, w, h, d);
-  // frame band where the wall meets the street
-  r.decoBox(pal.trim, cx, cy + 0.18, cz, w * 1.02, 0.3, 0.3);
-  r.decoBox(pal.trim, cx, cy + h, cz, w * 1.02, 0.24, 0.3);
 
-  const ww = w / (cols * 2);
-  const wh = h / (rows * 2.4);
-  for (let i = 0; i < cols; i++) {
-    for (let j = 0; j < rows; j++) {
-      const wx = cx - w / 2 + (i + 0.5) * (w / cols);
-      const wy = cy + (rows - j - 0.5) * (h / rows) + h / rows * 0.1;
-      // sill ledge under each window
-      r.decoBox(0x232a33, wx, wy - wh * 0.55, cz, ww * 1.12, 0.12, 0.24);
-      r.decoBox(0x312a22, wx, wy, cz, ww * 0.9, wh * 0.9, 0.08);
+  // stone plinth — a couple of courses hugging the base
+  for (let yb = 0.45; yb < 1.75 && yb < h - 1.4; yb += 0.9) {
+    r.decoBox(D_BASE, cx, yb, cz, w + 0.02, 0.85, d + 0.02);
+  }
+
+  // string courses at each floor break + a top frieze band
+  for (let i = 1; i <= rows; i++) {
+    const f = (i / rows) * h;
+    if (f < 1.7 || f > h - 0.15) continue;
+    r.decoBox(D_COURSE, cx, cy + f, cz, w * 1.0, 0.16, d * 1.0);
+  }
+  r.decoBox(pal.trim, cx, cy + h - 0.1, cz, w * 1.0, 0.14, d * 1.0);
+
+  const rand = lcg(Math.floor(cx * 7919 + cz * 104729 + h * 131));
+
+  const pane = (extent, colN, kx, kz, sign, horiz, elev) => {
+    const pww = (extent / colN) * 0.6;
+    const pwh = (h / rows) * 0.62;
+    const lit = rand() < 0.34;
+    const off = sign * 0.03;
+    r.decoBox(lit ? D_LIT : D_FRAME, kx, elev, kz, pww * 1.18, pwh * 1.18, 0.09, lit ? { emission: 0xffb35a, emissionBias: 1.1 } : {});
+    r.decoBox(lit ? D_LIT : D_GLASS, kx, elev, kz + (horiz ? 0 : off), pww * 0.9, pwh * 0.9, horiz ? 0.1 : 0.08, lit ? { emission: 0xffd98a, emissionBias: 1.3 } : {});
+    if (lit) {
+      r.decoBox(D_LIT2, kx, elev, kz + (horiz ? 0 : off), pww * 0.16, pwh * 0.94, 0.05, { emission: 0xfff0c0, emissionBias: 1.4 });
+      r.decoBox(D_LIT2, kx, elev, kz + (horiz ? 0 : off), pww * 0.94, pwh * 0.14, 0.05, { emission: 0xfff0c0, emissionBias: 1.4 });
+    } else {
+      r.decoBox(D_FRAME, kx, elev, kz + (horiz ? 0 : off), pww * 0.1, pwh * 0.96, 0.03);
+    }
+    r.decoBox(D_SILL, kx, elev - pwh * 0.6, kz, pww * 1.28, 0.1, 0.18);
+  };
+
+  // +/-z long faces
+  const cZ = Math.max(1, Math.round(w / 3.4));
+  for (const s of [1, -1]) {
+    for (let ci = 0; ci < cZ; ci++) {
+      for (let ri = 0; ri < rows; ri++) {
+        pane(w, cZ, cx - w / 2 + (ci + 0.5) * (w / cZ), cz + s * (d / 2 + 0.04), s, false,
+          cy + (rows - ri - 0.5) * (h / rows));
+      }
     }
   }
-  // lit ones
-  const litN = 3 + ((cx * 7 + cz * 13) % 4);
-  let seed = cx * 5 + cz * 3;
-  for (let i = 0; i < litN; i++) {
-    seed = (seed * 1103515245 + 12345) % 2147483648;
-    const ci = seed % cols;
-    seed = (seed * 1103515245 + 12345) % 2147483648;
-    const ri = seed % rows;
-    const ix = cx - w / 2 + (ci + 0.5) * (w / cols);
-    const iy = cy + (rows - ri - 0.5) * (h / rows);
-    r.decoBox(0xffd98a, ix, iy, cz, (w / (cols * 2)) * 0.72, (h / (rows * 2.4)) * 0.72, 0.16, { emission: 0xffb35a, emissionBias: 1.0 });
-    r.decoBox(0xfff0c0, ix, iy, cz - 0.06, (w / (cols * 2)) * 0.3, (h / (rows * 2.4)) * 0.3, 0.3, { emission: 0xffe9b0, emissionBias: 1.2 });
+  // +/-x faces (street-facing sides)
+  const cX = Math.max(1, Math.round(d / 3.4));
+  for (const s of [1, -1]) {
+    for (let ci = 0; ci < cX; ci++) {
+      for (let ri = 0; ri < rows; ri++) {
+        pane(d, cX, cx + s * (w / 2 + 0.04), cz - d / 2 + (ci + 0.5) * (d / cX), s, true,
+          cy + (rows - ri - 0.5) * (h / rows));
+      }
+    }
+  }
+
+  // entrance (front +z face)
+  if (opts.door !== false && h >= 4.5) {
+    const dz = cz + d / 2 + 0.05;
+    r.decoBox(0x2a1f1a, cx, 1.55, dz, 1.7, 2.9, 0.12);
+    r.decoBox(0x3a2d22, cx, 1.35, dz + 0.07, 1.1, 1.9, 0.1);
+    r.decoBox(pal.trim, cx, 3.05, dz, 2.0, 0.2, 0.34);
+    r.decoBox(D_SILL, cx, 0.2, dz, 2.1, 0.16, 0.36);
+    r.decoBox(D_LIT, cx, 2.92, dz + 0.03, 0.9, 0.12, 0.12, { emission: 0xffc06a, emissionBias: 1.1 });
+  }
+
+  // striped shop awning over the entry
+  if (opts.awning) {
+    const aw = typeof opts.awning === 'number' ? opts.awning : pal.trim;
+    const az = cz + d / 2 + 0.02;
+    r.decoBox(aw, cx, 3.42, az, 4.2, 0.1, 1.0);
+    for (let i = 0; i < 4; i++) {
+      r.decoBox(0xe3e9ee, cx - 2.0 + 0.5 + i * 1.0, 3.49, az, 0.92, 0.05, 0.9);
+    }
+  }
+
+  // rear fire escape ladders
+  if (opts.fireEscape) {
+    const rz = cz - d / 2 - 0.05;
+    const spread = Math.min(w * 0.24, 3.0);
+    let y = 1.5;
+    while (y < h - 1.2) {
+      r.decoBox(D_IRON, cx, y, rz, w * 0.14, 0.12, 0.12);
+      r.decoBox(D_IRON, cx - spread, y + 0.05, rz + 0.06, 0.08, 1.05, 0.08);
+      r.decoBox(D_IRON, cx + spread, y + 0.05, rz + 0.06, 0.08, 1.05, 0.08);
+      r.decoBox(D_IRON, cx, y + 1.05, rz + 0.12, w * 0.3, 0.08, 0.62);
+      for (const sx of [-0.6, 0, 0.6]) {
+        r.decoBox(D_IRON, cx + sx, y + 1.06, rz + 0.06, 0.05, 0.04, 0.05);
+      }
+      y += 1.5;
+    }
   }
 }
 
-// glowing neon sign across a facade; opts: { color, glow, h }
-export function neon(r, x, y, z, w, d, textHue = 0xff5a4a, opts = {}) {
-  const h = opts.h || 1.1;
-  const g = opts.glow || textHue;
-  r.decoBox(0x0c0f14, x, y, z, w, h, 0.18, { emission: 0x1c222a, emissionBias: 0.5 });
-  r.decoBox(textHue, x, y + h / 2 + 0.1, z, w - 0.1, 0.4, 0.2, { emission: g, emissionBias: 1.3 });
-  return r;
-}
-
-// building block with roof ridge, chimneys and parapets
+// building block with roof ridge, chimney, cornice and full-wrap facade
 export function building(r, pal, x, z, w, d, h, opts = {}) {
-  r.box(pal.wall, x, h / 2, z, w, h, d);
-  // street-level trim on the two long faces
-  r.decoBox(pal.trim, x, 0.22, z, w * 1.02, 0.24, 0.2);
-  r.decoBox(pal.trim, x, 0.22, z + d * 0.5, 0.2, 0.24, d * 0.96);
-  r.decoBox(pal.trim, x, 0.22, z - d * 0.5, 0.2, 0.24, d * 0.96);
+  // exterior trim under the roof cap
+  r.decoBox(pal.trim, x, h - 0.05, z, w * 1.04, 0.16, d * 1.04);
+  r.decoBox(D_COURSE, x, h - 0.34, z, w * 1.04, 0.14, d * 1.04);
+
+  const empty = Object.keys(opts).length === 0;
+  const opts2 = {
+    door: opts.door !== false,
+    awning: opts.awning,
+    fireEscape: opts.fireEscape,
+  };
+  windowWall(r, pal, x, 0, z, w, h, d, opts.winCols || 3, opts.winRows || 2, opts2);
 
   if (opts.roofSolid) {
     r.oneWay(x, h - 0.15, z, w * 0.92, d * 0.92, pal.roof);
@@ -94,9 +170,13 @@ export function building(r, pal, x, z, w, d, h, opts = {}) {
   }
 
   if (opts.dormer) r.decoBox(pal.trim, x, h + 0.45, z, w * 0.24, 0.5, d * 0.24);
-  if (opts.windows !== false && h > 3) {
-    windowWall(r, pal, x, 0, z, w * 0.86, h * 0.8, 0.2, opts.winCols || 3, opts.winRows || 2);
-  }
+  return r;
+}
+export function neon(r, x, y, z, w, d, textHue = 0xff5a4a, opts = {}) {
+  const h = opts.h || 1.1;
+  const g = opts.glow || textHue;
+  r.decoBox(0x0c0f14, x, y, z, w, h, 0.18, { emission: 0x1c222a, emissionBias: 0.5 });
+  r.decoBox(textHue, x, y + h / 2 + 0.1, z, w - 0.1, 0.4, 0.2, { emission: g, emissionBias: 1.3 });
   return r;
 }
 

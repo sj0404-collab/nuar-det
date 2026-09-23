@@ -28,20 +28,20 @@ function buildHub(mk, world) {
   r.region(-70, 70, -20, 55, -80, 80);
 
   // east-side buildings
-  building(r, pal, 24, -52, 11, 9, 9, { windows: true, roofSolid: true });
-  building(r, pal, 42, -36, 12, 9, 6, { windows: true });
-  building(r, pal, 38, -18, 9, 7, 12, { windows: true });
-  building(r, pal, 32, 0, 10, 8, 7, { windows: true, roofSolid: true });
-  building(r, pal, 40, 18, 11, 9, 11, { windows: true });
+  building(r, pal, 24, -52, 11, 9, 9, { windows: true, roofSolid: true, fireEscape: true, awning: pal.trim });
+  building(r, pal, 42, -36, 12, 9, 6, { windows: true, fireEscape: true });
+  building(r, pal, 38, -18, 9, 7, 12, { windows: true, winRows: 3 });
+  building(r, pal, 32, 0, 10, 8, 7, { windows: true, roofSolid: true, awning: COLORS.teal });
+  building(r, pal, 40, 18, 11, 9, 11, { windows: true, winRows: 3, fireEscape: true });
   building(r, pal, 34, 38, 9, 9, 6, { windows: true });
-  building(r, pal, 44, 54, 12, 9, 9, { windows: true });
+  building(r, pal, 44, 54, 12, 9, 9, { windows: true, awning: COLORS.gold });
   // west-side buildings
-  building(r, pal, -24, -52, 11, 9, 10, { windows: true, roofSolid: true });
+  building(r, pal, -24, -52, 11, 9, 10, { windows: true, roofSolid: true, fireEscape: true });
   building(r, pal, -42, -36, 12, 9, 7, { windows: true });
-  building(r, pal, -38, -18, 9, 7, 12, { windows: true, roofSolid: true });
-  building(r, pal, -32, 0, 10, 8, 6, { windows: true });
-  building(r, pal, -40, 18, 11, 9, 12, { windows: true });
-  building(r, pal, -34, 38, 9, 9, 7, { windows: true, roofSolid: true });
+  building(r, pal, -38, -18, 9, 7, 12, { windows: true, roofSolid: true, winRows: 3, fireEscape: true });
+  building(r, pal, -32, 0, 10, 8, 6, { windows: true, awning: COLORS.brickDark });
+  building(r, pal, -40, 18, 11, 9, 12, { windows: true, winRows: 3 });
+  building(r, pal, -34, 38, 9, 9, 7, { windows: true, roofSolid: true, fireEscape: true });
   building(r, pal, -44, 54, 12, 9, 9, { windows: true });
 
   // northern short street to clocktower
@@ -119,9 +119,9 @@ function buildMarket(mk, world) {
   stall(r, pal, 114, 18, 5, 4, { awning: COLORS.brickDark });
   stall(r, pal, 146, 14, 5, 4);
 
-  building(r, pal, 112, -48, 32, 10, 10, { windows: true });
-  building(r, pal, 160, -48, 24, 10, 14, { windows: true, roofSolid: true });
-  building(r, pal, 106, 52, 28, 10, 12, { windows: true });
+  building(r, pal, 112, -48, 32, 10, 10, { windows: true, winCols: 4, awning: COLORS.gold });
+  building(r, pal, 160, -48, 24, 10, 14, { windows: true, roofSolid: true, winRows: 3, fireEscape: true });
+  building(r, pal, 106, 52, 28, 10, 12, { windows: true, winCols: 4, awning: COLORS.teal });
   building(r, pal, 166, 52, 22, 10, 8, { windows: true, roofSolid: true });
 
   crates(r, 110, 6, 3);
