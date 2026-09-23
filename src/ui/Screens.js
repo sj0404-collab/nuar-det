@@ -9,6 +9,7 @@ export class Screens {
     this.pause = document.getElementById('screen-pause');
     this.settings = document.getElementById('screen-settings');
     this.map = document.getElementById('screen-map');
+    this.inventory = document.getElementById('screen-inventory');
     this.loadScreen = document.getElementById('load-screen');
 
     document.getElementById('btn-start').addEventListener('click', () => {
@@ -25,6 +26,27 @@ export class Screens {
     document.getElementById('btn-to-title').addEventListener('click', () => this.hooks.onToTitle && this.hooks.onToTitle());
     document.getElementById('btn-map').addEventListener('click', () => this.hooks.onMap && this.hooks.onMap());
     document.getElementById('btn-menu').addEventListener('click', () => this.hooks.onPause && this.hooks.onPause());
+
+    // камера: три отдельные кнопки видов
+    for (const [id, mode] of [['btn-cam-side', 'orbit'], ['btn-cam-top', 'top'], ['btn-cam-fps', 'fps']]) {
+      const btn = document.getElementById(id);
+      if (btn) btn.addEventListener('click', () => this.hooks.onCameraMode && this.hooks.onCameraMode(mode));
+    }
+    this.camButtons = {
+      orbit: document.getElementById('btn-cam-side'),
+      top: document.getElementById('btn-cam-top'),
+      fps: document.getElementById('btn-cam-fps'),
+    };
+
+    // инвентарь: колода и улики
+    this.invDeck = document.getElementById('inv-deck');
+    this.invClues = document.getElementById('inv-clues');
+    document.getElementById('btn-inventory').addEventListener('click', () => this.hooks.onInventory && this.hooks.onInventory());
+    document.getElementById('btn-inv-close').addEventListener('click', () => { this.hideInventory(); this.hooks.onResume && this.hooks.onResume(); });
+    const tabDeck = document.getElementById('btn-tab-deck');
+    const tabClues = document.getElementById('btn-tab-clues');
+    if (tabDeck) tabDeck.addEventListener('click', () => this.showInvTab('deck'));
+    if (tabClues) tabClues.addEventListener('click', () => this.showInvTab('clues'));
 
     // settings screen
     const openSettings = () => this.showSettings();
@@ -280,6 +302,94 @@ export class Screens {
   hideSettings() { this.settings.classList.add('hidden'); }
   showMap() { this.map.classList.remove('hidden'); this.settings.classList.add('hidden'); }
   hideMap() { this.map.classList.add('hidden'); }
+
+  setCameraMode(mode) {
+    if (!this.camButtons) return;
+    for (const key of Object.keys(this.camButtons)) {
+      const b = this.camButtons[key];
+      if (b) b.classList.toggle('active', key === mode);
+    }
+  }
+
+  showInventory() {
+    this.inventory.classList.remove('hidden');
+    this.settings.classList.add('hidden');
+    if (this.hooks.getInventory) {
+      const data = this.hooks.getInventory();
+      this.renderDeck(data.deck || []);
+      this.renderClues(data.clues || [], data.tools || []);
+    }
+  }
+  hideInventory() { this.inventory.classList.add('hidden'); }
+
+  showInvTab(tab) {
+    const deck = tab !== 'clues';
+    if (this.invDeck) this.invDeck.classList.toggle('hidden', !deck);
+    if (this.invClues) this.invClues.classList.toggle('hidden', deck);
+    const td = document.getElementById('btn-tab-deck');
+    const tc = document.getElementById('btn-tab-clues');
+    if (td) td.classList.toggle('active', deck);
+    if (tc) tc.classList.toggle('active', !deck);
+  }
+
+  invCard(cls, art, name, meta, desc) {
+    const el = document.createElement('div');
+    el.className = 'inv-card ' + cls;
+    if (art) { const a = document.createElement('div'); a.className = 'card-art'; a.textContent = art; el.appendChild(a); }
+    const n = document.createElement('div'); n.className = 'card-name'; n.textContent = name; el.appendChild(n);
+    if (meta) { const m = document.createElement('div'); m.className = 'card-meta'; m.textContent = meta; el.appendChild(m); }
+    if (desc) { const d = document.createElement('div'); d.className = 'card-desc'; d.textContent = desc; el.appendChild(d); }
+    return el;
+  }
+
+  renderDeck(cards) {
+    if (!this.invDeck) return;
+    this.invDeck.innerHTML = '';
+    const total = cards.length;
+    const header = document.createElement('div');
+    header.className = 'inv-section';
+    header.textContent = 'В колоде: ' + total + ' карт';
+    this.invDeck.appendChild(header);
+    if (!total) {
+      const e = document.createElement('div');
+      e.className = 'inv-empty';
+      e.textContent = 'Колода пуста.';
+      this.invDeck.appendChild(e);
+      return;
+    }
+    for (const c of cards) {
+      const kind = c.kind === 'def' ? 'def' : c.kind === 'util' ? 'util' : '';
+      this.invDeck.appendChild(this.invCard('kind-' + (kind || 'def'), c.art, c.name,
+        'Стоимость ' + c.cost, c.desc));
+    }
+  }
+
+  renderClues(clues, tools) {
+    if (!this.invClues) return;
+    this.invClues.innerHTML = '';
+    const head1 = document.createElement('div');
+    head1.className = 'inv-section';
+    head1.textContent = 'Улики и находки';
+    this.invClues.appendChild(head1);
+    if (!clues.length) {
+      const e = document.createElement('div');
+      e.className = 'inv-empty';
+      e.textContent = 'Пока ничего не найдено.';
+      this.invClues.appendChild(e);
+    }
+    for (const c of clues) this.invClues.appendChild(this.invCard('kind-evi', c.icon, c.name, c.meta, c.desc));
+    const head2 = document.createElement('div');
+    head2.className = 'inv-section';
+    head2.textContent = 'Инструменты и способности';
+    this.invClues.appendChild(head2);
+    if (!tools.length) {
+      const e2 = document.createElement('div');
+      e2.className = 'inv-empty';
+      e2.textContent = 'Инструменты не получены.';
+      this.invClues.appendChild(e2);
+    }
+    for (const t of tools) this.invClues.appendChild(this.invCard('kind-tool', t.icon, t.name, t.meta, t.desc));
+  }
 
   hideLoad() { this.loadScreen.classList.add('hidden'); }
   showLoad() { this.loadScreen.classList.remove('hidden'); }
