@@ -15,7 +15,7 @@ function citizenFigure(opts) {
   const g = new THREE.Group();
 
   // legs (groups pivot at the hip for walk swing)
-  const legGeo = flatGeometry(new THREE.CylinderGeometry(0.07, 0.085, 0.4, 4));
+  const legGeo = flatGeometry(new THREE.CylinderGeometry(0.07, 0.085, 0.4, 8, 2));
   const legL = new THREE.Group();
   const legLm = new THREE.Mesh(legGeo, darkMat);
   legLm.position.y = -0.2;
@@ -29,34 +29,34 @@ function citizenFigure(opts) {
   g.add(legL, legR);
 
   // torso coat
-  const coatGeo = flatGeometry(new THREE.CylinderGeometry(0.19, 0.27, 0.6, 5, 1));
+  const coatGeo = flatGeometry(new THREE.CylinderGeometry(0.19, 0.27, 0.6, 8, 2));
   coatGeo.translate(0, 0.5, 0);
   const body = new THREE.Mesh(coatGeo, coatMat);
   body.position.y = 0.15;
   g.add(body);
 
   // head + hat
-  const head = new THREE.Mesh(flatGeometry(new THREE.SphereGeometry(0.13, 6, 5)), skinMat);
+  const head = new THREE.Mesh(flatGeometry(new THREE.SphereGeometry(0.13, 10, 8)), skinMat);
   head.position.y = 0.98;
   const headG = new THREE.Group();
   headG.add(head);
   const hatMat = makePainterlyMaterial(opts.hatColor || 0x242a33, { rimStrength: 0.4 });
   const hatType = opts.hat || HATS[Math.floor(Math.random() * HATS.length)];
   if (hatType === 'beret') {
-    const b = new THREE.Mesh(flatGeometry(new THREE.SphereGeometry(0.15, 6, 4).scale(1, 0.45, 1)), hatMat);
+    const b = new THREE.Mesh(flatGeometry(new THREE.SphereGeometry(0.15, 10, 7).scale(1, 0.45, 1)), hatMat);
     b.position.y = 0.12;
     headG.add(b);
   } else if (hatType === 'flat') {
-    const cap = new THREE.Mesh(flatGeometry(new THREE.CylinderGeometry(0.12, 0.14, 0.1, 6)), hatMat);
+    const cap = new THREE.Mesh(flatGeometry(new THREE.CylinderGeometry(0.12, 0.14, 0.1, 10)), hatMat);
     cap.position.y = 0.12;
     headG.add(cap);
-    const brim = new THREE.Mesh(flatGeometry(new THREE.CylinderGeometry(0.17, 0.17, 0.03, 6)), hatMat);
+    const brim = new THREE.Mesh(flatGeometry(new THREE.CylinderGeometry(0.17, 0.17, 0.03, 10)), hatMat);
     brim.position.y = 0.09;
     headG.add(brim);
   } else {
-    const brim = new THREE.Mesh(flatGeometry(new THREE.CylinderGeometry(0.18, 0.18, 0.03, 7)), hatMat);
+    const brim = new THREE.Mesh(flatGeometry(new THREE.CylinderGeometry(0.18, 0.18, 0.03, 10)), hatMat);
     brim.position.y = 0.12;
-    const crown = new THREE.Mesh(flatGeometry(new THREE.CylinderGeometry(0.1, 0.13, 0.14, 6)), hatMat);
+    const crown = new THREE.Mesh(flatGeometry(new THREE.CylinderGeometry(0.1, 0.13, 0.14, 10)), hatMat);
     crown.position.y = 0.19;
     headG.add(brim, crown);
   }
@@ -64,7 +64,7 @@ function citizenFigure(opts) {
   g.add(headG);
 
   // arms
-  const armGeo = flatGeometry(new THREE.CylinderGeometry(0.045, 0.055, 0.4, 4));
+  const armGeo = flatGeometry(new THREE.CylinderGeometry(0.045, 0.055, 0.4, 8, 2));
   const armL = new THREE.Group();
   const armLm = new THREE.Mesh(armGeo, coatMat);
   armLm.position.y = -0.12;

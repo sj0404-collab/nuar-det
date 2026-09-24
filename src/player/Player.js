@@ -65,7 +65,7 @@ export class Player {
 
     // --- legs ---
     this.legL = new THREE.Group();
-    const legGeo = flatGeometry(new THREE.CylinderGeometry(0.09, 0.115, 0.36, 5));
+    const legGeo = flatGeometry(new THREE.CylinderGeometry(0.09, 0.115, 0.36, 8, 2));
     const legLM = new THREE.Mesh(legGeo, darkMat);
     legLM.position.y = -0.16;
     const shoeMat = makeToon(0x16191f);
@@ -73,7 +73,7 @@ export class Player {
     shoeL.position.set(0, -0.37, 0.05);
     this.legL.add(legLM, shoeL);
     this.legR = new THREE.Group();
-    const legRM = new THREE.Mesh(flatGeometry(new THREE.CylinderGeometry(0.09, 0.115, 0.36, 5)), darkMat);
+    const legRM = new THREE.Mesh(flatGeometry(new THREE.CylinderGeometry(0.09, 0.115, 0.36, 8, 2)), darkMat);
     legRM.position.y = -0.16;
     const shoeR = new THREE.Mesh(flatGeometry(new THREE.BoxGeometry(0.12, 0.09, 0.2)), shoeMat);
     shoeR.position.set(0, -0.37, 0.05);
@@ -82,15 +82,15 @@ export class Player {
     this.legR.position.set(0.16, -0.04, 0);
     bodyG.add(this.legL, this.legR);
 
-    // --- trench coat (anime blazer shape, low-poly prism) ---
-    const coatGeo = flatGeometry(new THREE.CylinderGeometry(0.2, 0.34, 0.92, 6, 1));
+    // --- trench coat (anime blazer shape, smoother tapered torso) ---
+    const coatGeo = flatGeometry(new THREE.CylinderGeometry(0.2, 0.34, 0.92, 10, 2));
     coatGeo.translate(0, 0.5, 0);
     this.coat = new THREE.Mesh(coatGeo, coatMat);
     this.coat.position.y = 0;
     bodyG.add(this.coat);
 
     // collar
-    const collarGeo = flatGeometry(new THREE.TorusGeometry(0.17, 0.06, 5, 9, Math.PI * 0.9));
+    const collarGeo = flatGeometry(new THREE.TorusGeometry(0.17, 0.06, 6, 14, Math.PI * 0.9));
     collarGeo.rotateX(Math.PI / 2);
     this.collar = new THREE.Mesh(collarGeo, coatMat);
     this.collar.position.set(0, 0.98, 0);
@@ -98,13 +98,13 @@ export class Player {
 
     // --- arms ---
     this.armL = new THREE.Group();
-    const armGeo = flatGeometry(new THREE.CylinderGeometry(0.055, 0.07, 0.5, 5));
+    const armGeo = flatGeometry(new THREE.CylinderGeometry(0.055, 0.07, 0.5, 8, 2));
     const armLM = new THREE.Mesh(armGeo, coatMat);
     armLM.position.y = -0.15;
     this.armL.add(armLM);
     this.armL.position.set(-0.32, 0.62, 0);
     this.armR = new THREE.Group();
-    const armRM = new THREE.Mesh(flatGeometry(new THREE.CylinderGeometry(0.055, 0.07, 0.5, 5)), coatMat);
+    const armRM = new THREE.Mesh(flatGeometry(new THREE.CylinderGeometry(0.055, 0.07, 0.5, 8, 2)), coatMat);
     armRM.position.y = -0.15;
     this.armR.add(armRM);
     this.armR.position.set(0.32, 0.62, 0);
@@ -112,7 +112,7 @@ export class Player {
 
     // --- anime head: stylised face + big expressive eyes ---
     const headG = new THREE.Group();
-    const headGeo = flatGeometry(new THREE.SphereGeometry(0.17, 7, 5));
+    const headGeo = flatGeometry(new THREE.SphereGeometry(0.17, 12, 9));
     const skull = new THREE.Mesh(headGeo, skinMat);
     skull.scale.set(0.95, 1.1, 0.98);
     skull.position.y = 1.22;
@@ -131,32 +131,54 @@ export class Player {
     const headMesh = skull;
 
     // --- fedora ---
-    const brim = new THREE.Mesh(flatGeometry(new THREE.CylinderGeometry(0.3, 0.3, 0.035, 8)), hatMat);
+    const brim = new THREE.Mesh(flatGeometry(new THREE.CylinderGeometry(0.3, 0.3, 0.035, 12)), hatMat);
     brim.position.y = 1.45;
-    const crownGeo = flatGeometry(new THREE.CylinderGeometry(0.16, 0.2, 0.2, 7));
+    const crownGeo = flatGeometry(new THREE.CylinderGeometry(0.16, 0.2, 0.2, 10));
     crownGeo.translate(0, 0.1, 0);
     const crown = new THREE.Mesh(crownGeo, hatMat);
     crown.position.y = 1.45;
     // band
     const bandMat = makeToon(0x7a3b2e, { emission: 0x7a3b2e, emissionBias: 0.25 });
-    const band = new THREE.Mesh(flatGeometry(new THREE.CylinderGeometry(0.175, 0.185, 0.05, 8)), bandMat);
+    const band = new THREE.Mesh(flatGeometry(new THREE.CylinderGeometry(0.175, 0.185, 0.05, 12)), bandMat);
     band.position.y = 1.51;
     this.hat = new THREE.Group();
     this.hat.add(brim, crown, band);
     this.hat.position.y = 0.02;
     bodyG.add(this.hat);
 
-    // --- scarf (trailing ribbon, lags the turn) ---
+    // --- scarf (cloth: hinged ribbon, wave travels from the knot out) ---
     const scarfMat = makeToon(0xc98f3f, { rimStrength: 0.3 });
+    const scarfGlowMat = makeToon(0xc98f3f, { emission: 0x8a5f2e, emissionBias: 0.12, rimStrength: 0.3 });
     this.scarf = new THREE.Group();
-    const knot = new THREE.Mesh(flatGeometry(new THREE.BoxGeometry(0.26, 0.07, 0.14)), scarfMat);
-    knot.position.set(0, 0.14, -0.05);
-    const tailMat = makeToon(0xc98f3f, { emission: 0x8a5f2e, emissionBias: 0.12, rimStrength: 0.3 });
-    const tailGeo = flatGeometry(new THREE.CylinderGeometry(0.018, 0.07, 0.5, 5));
-    tailGeo.rotateX(Math.PI / 2);
-    this.scarfTail = new THREE.Mesh(tailGeo, tailMat);
-    this.scarfTail.position.set(0, 0.06, -0.36);
-    this.scarf.add(knot, this.scarfTail);
+    const knot = new THREE.Mesh(flatGeometry(new THREE.BoxGeometry(0.24, 0.09, 0.16, 2, 2, 2)), scarfGlowMat);
+    knot.position.set(0, 0.14, -0.04);
+    this.scarf.add(knot);
+
+    // костяная лента: каждый сегмент — тонкая пластинка, шарнир на задней кромке
+    // предыдущего; углы с шагом растут к кончику, волна бежит наружу — ткань, а не палка
+    const SCARF_SEGS = 12;
+    const LINK_LEN = 0.13;
+    const linkGeo = flatGeometry(new THREE.BoxGeometry(0.088, 0.014, LINK_LEN, 2, 1, 2));
+    const tipGeo = flatGeometry(new THREE.BoxGeometry(0.058, 0.012, LINK_LEN, 2, 1, 2));
+    this.scarfSegs = [];
+    let rootZ = -0.12;
+    for (let i = 0; i < SCARF_SEGS; i++) {
+      const linkG = new THREE.Group();
+      const link = new THREE.Mesh(i === SCARF_SEGS - 1 ? tipGeo : linkGeo, i === SCARF_SEGS - 1 ? scarfGlowMat : scarfMat);
+      link.position.z = -LINK_LEN / 2;
+      linkG.add(link);
+      linkG.position.set(0, 0, rootZ);
+      linkG.rotation.x = 0.08;
+      this.scarf.add(linkG);
+      this.scarfSegs.push({
+        g: linkG,
+        cur: 0.08,
+        droop: 0.06 + (i / SCARF_SEGS) * 0.6,
+        phase: i * 0.85,
+        swayPhase: i * 0.7,
+      });
+      rootZ -= LINK_LEN;
+    }
     this.scarf.position.y = 1.0;
     bodyG.add(this.scarf);
     this.scarfYaw = Math.PI;
@@ -388,8 +410,19 @@ export class Player {
     while (yawD < -Math.PI) yawD += Math.PI * 2;
     this.scarfYaw += yawD * Math.min(1, dt * 4.5);
     this.scarf.rotation.y = this.scarfYaw - this.mesh.rotation.y;
-    const flutter = Math.sin(t * 7) * 0.14 + lean * 0.5;
-    this.scarf.rotation.x = flutter * Math.sign(this.scarf.rotation.y > 0.05 ? -1 : 1) * Math.min(1, Math.abs(this.scarf.rotation.y) * 2 + 0.4);
+    // cloth wave: droop grows toward the tip, a travelling wave and a gust of
+    // wind lift and sway each hinge; dashing streams the tail behind flat
+    const wind = 0.6 + 0.4 * Math.sin(t * 0.95);
+    const leanK = 1 - lean * 0.6;
+    for (let i = 0; i < this.scarfSegs.length; i++) {
+      const s = this.scarfSegs[i];
+      const k = i / this.scarfSegs.length;
+      const wave = Math.sin(t * 7.5 - s.phase) * (0.05 + k * 0.19) * wind;
+      const target = s.droop * leanK + wave;
+      s.cur += (target - s.cur) * Math.min(1, dt * 7);
+      s.g.rotation.x = s.cur;
+      s.g.rotation.z = Math.sin(t * 3.4 + s.swayPhase) * 0.06 * wind * (0.3 + k * 0.7);
+    }
     this.scarf.position.y = 1.0 + Math.sin(t * 5) * 0.015;
 
     // squash on landing
