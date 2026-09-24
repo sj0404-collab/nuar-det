@@ -18,6 +18,8 @@ export class SkyDome {
       uMoonDir: { value: new THREE.Vector3(-0.55, 0.35, 0.75) },
       uStarFade: { value: 1.0 },
       uMistShift: { value: 0.0 },
+      uTime: { value: 0.0 },
+      uDusk: { value: 0.0 },
     };
     const mat = new THREE.ShaderMaterial({
       uniforms,
@@ -35,12 +37,20 @@ export class SkyDome {
         uniform vec3 uTop; uniform vec3 uMid; uniform vec3 uHor; uniform vec3 uGlowY;
         uniform vec3 uDayTop; uniform vec3 uDayMid; uniform vec3 uDayHor;
         uniform float uDayFactor;
+        uniform float uDusk;
+        uniform float uTime;
         uniform vec3 uSunDir;
         uniform vec3 uMoonDir;
         uniform float uStarFade;
         uniform float uMistShift;
         float hash12(vec2 p) {
           return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453);
+        }
+        float noised(vec2 p) {
+          vec2 i = floor(p); vec2 f = fract(p);
+          vec2 u = f * f * (3.0 - 2.0 * f);
+          return mix(mix(hash12(i), hash12(i + vec2(1.0, 0.0)), u.x),
+                     mix(hash12(i + vec2(0.0, 1.0)), hash12(i + vec2(1.0, 1.0)), u.x), u.y);
         }
         void main() {
           vec3 p = normalize(vPos);
@@ -58,30 +68,46 @@ export class SkyDome {
             col = mix(hor, mid, smoothstep(0.0, 1.0, t));
             col = mix(col, hor, smoothstep(0.0, 1.0, t) * 0.4);
           }
+          // dusk: warm band on the horizon + violet wash toward zenith
+          float horz = pow(clamp(1.0 - abs(h), 0.0, 1.0), 3.0);
+          col += vec3(0.95, 0.42, 0.22) * horz * uDusk * 0.55;
+          col += vec3(0.45, 0.16, 0.52) * clamp(1.0 - h * h, 0.0, 1.0) * uDusk * 0.4;
+          // moon: wide halo + distance-shrunk disc with crater mottling + terminator
+          float moonNight = 1.0 - uDayFactor;
+          float md = max(dot(p, normalize(uMoonDir)), 0.0);
+          col += vec3(0.7, 0.8, 0.95) * pow(md, 26.0) * 0.3 * moonNight;
+          float disc = pow(md, 950.0);
+          float crater = 0.5 + 0.5 * noised(p.xz * 10.0 + vec2(0.31, 0.77));
+          vec3 moonColor = mix(vec3(0.66, 0.7, 0.78), vec3(0.92, 0.94, 0.99), crater);
+          col += moonColor * disc * moonNight * 0.95;
+          col += moonColor * disc * (0.1 + 0.12 * clamp(dot(p, normalize(uSunDir)), -0.6, 0.0)) * moonNight;
           // moon glow (stronger at night)
           vec3 mps = normalize(vec3(p.x, p.y - 0.02, p.z));
           float mg = exp(-14.0 * length(mps.xz - uMoonDir.xz * 0.55) * 0.22);
-          col += uGlowY * mg * (1.0 - uDayFactor) * 0.6;
+          col += uGlowY * mg * moonNight * 0.6;
           // sun disc & horizon haze at day dusk
           float sd = max(dot(p, normalize(uSunDir)), 0.0);
           col += vec3(1.0, 0.84, 0.55) * pow(sd, 260.0) * uDayFactor * 1.4;
           col += vec3(1.0, 0.66, 0.4) * pow(sd, 8.0) * uDayFactor * 0.5;
-          // stars
+          // stars, twinkling
           float stars = 0.0;
           if (h > 0.35) {
             vec2 cell = floor(p.xz * 90.0);
             float rnd = hash12(cell);
             float px = fract(p.x * 90.0) - 0.5;
             float pz = fract(p.z * 90.0) - 0.5;
-            if (rnd > 0.985) {
-              float d = smoothstep(0.2, 0.04, length(vec2(px, pz)));
-              stars = d * (0.2 + rnd * 0.6);
-            }
+            float d = smoothstep(0.2, 0.04, length(vec2(px, pz)));
+            float tw = 0.62 + 0.38 * sin(uTime * (1.4 + rnd * 4.0) + rnd * 47.0);
+            stars = d * (0.2 + rnd * 0.6) * tw * step(0.985, rnd);
           }
           col += vec3(0.75, 0.85, 1.0) * stars * uStarFade;
           col += vec3(0.9, 0.95, 1.0) * stars * uStarFade * 0.3;
+          // faint patchy milky way band at night
+          float band = exp(-pow(dot(p, normalize(vec3(0.42, 0.12, -0.9))), 2.0) * 26.0);
+          band *= 0.5 + 0.5 * noised(vec2(atan(p.x, p.z) * 6.0, p.y * 9.0) + vec2(0.9, 0.3));
+          col += vec3(0.55, 0.6, 0.75) * band * 0.18 * moonNight * smoothstep(0.3, 0.6, h);
           // twilight ribbon
-          col += vec3(0.98, 0.6, 0.35) * pow(clamp(1.0 - abs(p.y), 0.0, 1.0), 3.0) * uMistShift * 0.35;
+          col += vec3(0.98, 0.6, 0.35) * horz * uMistShift * 0.35;
           gl_FragColor = vec4(col, 1.0);
         }
       `,
@@ -97,6 +123,9 @@ export class SkyDome {
 
   update(time, dayFactor = 0) {
     this.uniforms.uDayFactor.value = dayFactor;
+    this.uniforms.uTime.value = time;
+    // dusk flash when the sun sits near the horizon (mid-transition)
+    this.uniforms.uDusk.value = Math.exp(-Math.pow((dayFactor - 0.3) / 0.1, 2));
     // stars fade out during day
     this.uniforms.uStarFade.value = 1.0 - dayFactor * 0.85;
     // mist-shift in the haze band; stronger at dusk/night

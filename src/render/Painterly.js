@@ -10,6 +10,7 @@ function buildPainterlyShader() {
       uLightColor: { value: new THREE.Color(0xffe6c0) },
       uAmbient: { value: new THREE.Color(0x243350) },
       uFill: { value: new THREE.Color(0x3e5b88) },
+      uShade: { value: new THREE.Color(0x161b29) },
       uRimColor: { value: new THREE.Color(0x4a86b8) },
       uRimPower: { value: 2.4 },
       uRimStrength: { value: 0.5 },
@@ -40,6 +41,7 @@ function buildPainterlyShader() {
       uniform vec3 uLightColor;
       uniform vec3 uAmbient;
       uniform vec3 uFill;
+      uniform vec3 uShade;
       uniform vec3 uRimColor;
       uniform float uRimPower;
       uniform float uRimStrength;
@@ -94,10 +96,12 @@ function buildPainterlyShader() {
         }
 
         vec3 base = uColor * uTint;
-        vec3 col = base * (uLightColor * s + uAmbient);
+        vec3 lit = base * (uLightColor * s + uAmbient);
 
-        // painterly: pull light back toward the local pigment so bands stay readable
-        col = mix(col, base * (uAmbient * 2.2), 0.06);
+        // painterly: shadowed zones tint toward the deep underpaint pigment,
+        // lit zones keep their local color — gouache-like flattened shading
+        float litAmt = clamp(0.26 + band * 1.8, 0.0, 1.0);
+        vec3 col = mix(base * uShade * 0.8 + uShade * 0.12, lit, litAmt);
 
         // cool secondary fill from below (night city bounce light)
         col += base * uFill * (1.0 - clamp(d, -0.3, 0.6)) * 0.22;
@@ -113,8 +117,10 @@ function buildPainterlyShader() {
         // emissive glow (fixed: bias defaults on when emission supplied)
         col += uEmission * uEmissiveBias;
 
-        // paint grain: keeps large merged surfaces from looking plastic
-        col += (grainNoise(gl_FragCoord.xy) - 0.5) * uGrain * (1.0 - uEmissiveBias);
+        // paint grain: two-frequency tooth keeps merged surfaces from plastic
+        float gBig = (grainNoise(gl_FragCoord.xy * 0.31) - 0.5) * 1.7;
+        float gFine = (grainNoise(gl_FragCoord.xy * 3.1 + 17.0) - 0.5) * 0.8;
+        col += (gBig + gFine) * uGrain * (1.0 - uEmissiveBias);
 
         // fog
         float fogF = smoothstep(fogNear, fogFar, length(vWorld - cameraPosition));
