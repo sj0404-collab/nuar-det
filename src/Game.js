@@ -1737,8 +1737,8 @@ export class Game {
 
     const aspect = this.camera.aspect;
     const portrait = aspect < 1;
-    const dist = portrait ? 11.5 : 9;
-    const hy = portrait ? 3.6 : 3.1;
+    const dist = portrait ? 13 : 9;
+    const hy = portrait ? 4.6 : 3.1;
     const ax = Math.sin(this.cameraYaw) * dist;
     const az = Math.cos(this.cameraYaw) * dist;
     const targetX = p.pos.x - ax;
