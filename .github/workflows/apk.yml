@@ -39,8 +39,22 @@ jobs:
       - name: Rename APK to match version.json
         working-directory: android
         run: |
-          APK=$(ls app/build/outputs/apk/release/*.apk | head -1)
+          APK=$(ls app/build/outputs/apk/release/*.apk | grep -v baseline | head -1)
           cp -f "$APK" app/build/outputs/apk/release/nuar-det.apk
+
+      # Возвращаем свежий APK в master, чтобы страница (pages.yml копирует
+      # release/nuar-det.apk на сайт) всегда отдавала бинарник, собранный
+      # ровно из того version.json, который лежит на сайте. Иначе версия
+      # в приложении и версия бинарника расходятся и APK «зацикливается» —
+      # предлагает обновление на ту же самую версию.
+      - name: Commit APK + version.json back to master
+        run: |
+          cp -f android/app/build/outputs/apk/release/nuar-det.apk release/nuar-det.apk
+          git config user.name "nuar-det bot"
+          git config user.email "nuardet@users.noreply.github.com"
+          git add release/nuar-det.apk version.json
+          git diff --cached --quiet || git commit -m "release: ship APK $(node -p \"require('./version.json').version\") (built by CI)"
+          git push origin HEAD:master
 
       - name: Upload APK to GitHub Release
         uses: softprops/action-gh-release@v2
