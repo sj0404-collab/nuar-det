@@ -5,6 +5,8 @@ import { buildAnimeEyes, buildAnimeHair, buildAnimeMouth, makeToon } from '../re
 
 const GRAVITY = -24;
 const MOVE_SPEED = 6.4;
+const RUN_SPEED = 9.6;
+const CROUCH_SPEED = 3.4;
 const AIR_CTRL = 0.55;
 const JUMP_VEL = 14.2;
 const DOUBLE_JUMP_VEL = 12.5;
@@ -12,6 +14,9 @@ const WALL_JUMP_VEL = 12.5;
 const DASH_SPEED = 17;
 const DASH_TIME = 0.26;
 const DASH_CD = 0.65;
+const ATTACK_CD = 0.55;
+const ATTACK_RANGE = 1.9;
+const ATTACK_TIME = 0.32;
 
 export class Player {
   constructor(scene, effects, onSound) {
@@ -46,6 +51,11 @@ export class Player {
     this.walkT = 0;
     this.landT = 0;
     this.hurt = 0;
+    this.crouching = false;
+    this.running = false;
+    this.attackT = 0;
+    this.attackCd = 0;
+    this.onAttack = null;
 
     this.buildMesh(scene);
   }
@@ -229,7 +239,10 @@ export class Player {
     this.oneWays = oneWays;
   }
 
-  get headHeight() { return (this._headOffset || 1.28) + 0.05; }
+  get headHeight() {
+    const base = (this._headOffset || 1.28) + 0.05;
+    return this.crouching ? base * 0.6 : base;
+  }
 
   update(dt, input, cameraYaw, worldGatesSolids = []) {
     const solids = this.solids.concat(worldGatesSolids);
@@ -252,10 +265,25 @@ export class Player {
     this.coyote -= dt;
     this.buffer -= dt;
     this.hurt = Math.max(0, this.hurt - dt);
+    this.attackCd -= dt;
+    this.attackT = Math.max(0, this.attackT - dt);
 
     const wasGrounded = this.grounded;
+    const wantsRun = !!(input.run && this.grounded);
+    const wantsCrouch = !!(input.crouch && this.grounded);
+    this.running = wantsRun && !wantsCrouch && len > 0.12;
+    this.crouching = wantsCrouch;
 
-    if (input.dash && this.abilities.dash && this.dashCd <= 0 && this.dashT <= 0) {
+    if (input.attack && this.attackCd <= 0 && this.attackT <= 0) {
+      this.attackT = ATTACK_TIME;
+      this.attackCd = ATTACK_CD;
+      const atkPos = new THREE.Vector3(this.pos.x, this.pos.y + 1.1, this.pos.z);
+      if (this.effects) this.effects.punch(atkPos, this.facing.clone());
+      if (this.onSound) this.onSound('punch');
+      if (this.onAttack) this.onAttack(atkPos.clone(), this.facing.clone());
+    }
+
+    if (input.dash && this.abilities.dash && this.dashCd <= 0 && this.dashT <= 0 && !this.crouching) {
       this.dashT = DASH_TIME;
       this.dashCd = DASH_CD;
       if (len > 0.3) this.dashDir.set(mx, 0, mz).normalize();
@@ -270,8 +298,9 @@ export class Player {
       tz = this.dashDir.z * DASH_SPEED;
     } else {
       const ctrl = this.grounded ? 1 : AIR_CTRL + (this.abilities.wall ? 0.15 : 0);
-      tx = mx * MOVE_SPEED * ctrl;
-      tz = mz * MOVE_SPEED * ctrl;
+      const spd = this.crouching ? CROUCH_SPEED : (this.running ? RUN_SPEED : MOVE_SPEED);
+      tx = mx * spd * ctrl;
+      tz = mz * spd * ctrl;
       if (!this.grounded && this.abilities.wall && this.vel.y < 0 && this.wallSlide) {
         this.vel.y = -1.6;
       }
@@ -314,13 +343,14 @@ export class Player {
     }
 
     const prevY = this.pos.y;
+    const effHalfH = this.crouching ? this.halfH * 0.55 : this.halfH;
     const box = {
-      x: this.pos.x, y: this.pos.y + this.halfH, z: this.pos.z,
-      halfW: this.halfW, halfH: this.halfH, halfD: this.halfD,
+      x: this.pos.x, y: this.pos.y + effHalfH, z: this.pos.z,
+      halfW: this.halfW, halfH: effHalfH, halfD: this.halfD,
     };
     const res = moveBox(box, { x: tx * dt, y: ty * dt, z: tz * dt }, solids, this.oneWays);
     this.pos.x = res.pos.x;
-    this.pos.y = res.pos.y - this.halfH;
+    this.pos.y = res.pos.y - effHalfH;
     this.pos.z = res.pos.z;
     const landed = !this.grounded && res.grounded && (this.pos.y < prevY - 0.01);
     this.grounded = res.grounded;
@@ -353,7 +383,7 @@ export class Player {
     if (this.grounded && speed > 0.6) {
       this.walkT += dt * (4 + speed * 1.1);
       this.stepAcc = (this.stepAcc || 0) + dt * speed;
-      if (this.stepAcc > 1.35 && this.onSound) {
+      if (this.stepAcc > (this.crouching ? 2.6 : 1.35) && this.onSound) {
         this.stepAcc = 0;
         this.onSound('step');
       }
@@ -362,7 +392,7 @@ export class Player {
       this.stepAcc = 0;
     }
 
-    this.mesh.position.set(this.pos.x, this.pos.y + 0.06, this.pos.z);
+    this.mesh.position.set(this.pos.x, this.pos.y + (this.crouching ? 0.0 : 0.06), this.pos.z);
     this.animate(dt, speed, ty);
 
     if (this.pos.y < -60) {
@@ -380,16 +410,40 @@ export class Player {
     const walk = this.grounded && speed > 0.6;
     const a = walk ? Math.sin(this.walkT) : 0;
 
+    const attacking = this.attackT > 0;
+    const atkK = attacking ? 1 - this.attackT / ATTACK_TIME : 0;
+
     // legs swing
     const swing = a * (walk ? 0.7 : 0.05);
     this.legL.rotation.x = swing;
     this.legR.rotation.x = -swing * 0.96 + 0.08;
-    this.legL.position.x = walk ? -0.16 + Math.sin(this.walkT * 0.9) * 0.03 : -0.16;
-    this.legR.position.x = walk ? 0.16 - Math.sin(this.walkT * 0.9) * 0.03 : 0.16;
 
-    // arms counter-swing
-    this.armL.rotation.x = -swing * 0.55 + 0.25;
-    this.armR.rotation.x = swing * 0.55 + 0.25;
+    // crouch pose: knees bent, hips low, arms forward/guarding
+    if (this.crouching) {
+      this.legL.rotation.x = swing * 0.4 - 0.95;
+      this.legR.rotation.x = -swing * 0.4 - 0.8;
+      this.legL.position.y = -0.04;
+      this.legR.position.y = -0.04;
+    } else {
+      this.legL.position.x = walk ? -0.16 + Math.sin(this.walkT * 0.9) * 0.03 : -0.16;
+      this.legR.position.x = walk ? 0.16 - Math.sin(this.walkT * 0.9) * 0.03 : 0.16;
+      this.legL.position.y = -0.04;
+      this.legR.position.y = -0.04;
+    }
+
+    // arms: attack punches outward, otherwise counter-swing (crouch guards)
+    if (attacking) {
+      const punch = Math.sin(atkK * Math.PI);
+      this.armR.rotation.x = -2.4 * punch + 0.3;
+      this.armL.rotation.x = 0.9 + punch * 0.3;
+      this.armR.position.z = punch * 0.18;
+      this.armL.position.z = 0;
+    } else {
+      this.armR.position.z = 0;
+      this.armL.position.z = 0;
+      this.armR.rotation.x = this.crouching ? 1.15 : (swing * 0.55 + 0.25);
+      this.armL.rotation.x = this.crouching ? 1.15 : (-swing * 0.55 + 0.25);
+    }
 
     // coat bob & sway
     const bob = walk ? Math.abs(Math.sin(this.walkT)) * 0.05 : 0;
@@ -435,11 +489,14 @@ export class Player {
       this.mesh.scale.set(1, 1, 1);
     }
 
+    // crouch lowers the whole body
+    this.body.position.y = this.crouching ? -0.18 : 0;
+
     // airborne tilt
     if (!this.grounded) {
       this.mesh.rotation.z = vy > 0.5 ? -0.08 : 0.1;
     } else {
-      this.mesh.rotation.z = 0;
+      this.mesh.rotation.z = attacking ? Math.sin(atkK * Math.PI) * 0.12 : 0;
     }
   }
 

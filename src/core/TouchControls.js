@@ -9,6 +9,9 @@ export class TouchControls {
     this.camJoyThumb = document.getElementById('cam-joy-thumb');
     this.btnJump = document.getElementById('btn-jump');
     this.btnDash = document.getElementById('btn-dash');
+    this.btnRun = document.getElementById('btn-run');
+    this.btnCrouch = document.getElementById('btn-crouch');
+    this.btnAttack = document.getElementById('btn-attack');
     this.btnInteract = document.getElementById('btn-interact');
 
     this.onMove = onMove;
@@ -60,6 +63,18 @@ export class TouchControls {
 
     this.btnDash.addEventListener('pointerdown', (e) => { e.preventDefault(); this.onDash(true); });
     this.btnDash.addEventListener('pointerup', () => { this.onDash(false); });
+
+    this.btnRun.addEventListener('pointerdown', (e) => { e.preventDefault(); this.onRun && this.onRun(true); });
+    this.btnRun.addEventListener('pointerup', () => { this.onRun && this.onRun(false); });
+    this.btnRun.addEventListener('pointerleave', () => { this.onRun && this.onRun(false); });
+    this.btnRun.addEventListener('pointercancel', () => { this.onRun && this.onRun(false); });
+
+    this.btnCrouch.addEventListener('pointerdown', (e) => { e.preventDefault(); this.onCrouch && this.onCrouch(true); });
+    this.btnCrouch.addEventListener('pointerup', () => { this.onCrouch && this.onCrouch(false); });
+    this.btnCrouch.addEventListener('pointerleave', () => { this.onCrouch && this.onCrouch(false); });
+    this.btnCrouch.addEventListener('pointercancel', () => { this.onCrouch && this.onCrouch(false); });
+
+    this.btnAttack.addEventListener('pointerdown', (e) => { e.preventDefault(); this.onAttack && this.onAttack(); });
 
     this.btnInteract.addEventListener('pointerdown', (e) => { e.preventDefault(); this.onInteract && this.onInteract(); });
 

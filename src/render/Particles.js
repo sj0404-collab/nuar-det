@@ -435,4 +435,12 @@ export class Effects {
   wispHit(pos) {
     this.bursts.emit(pos, { count: 16, color: { r: 0.95, g: 0.35, b: 0.3 }, speed: 2.6, spread: 1, lift: 1.4, gravity: 1.5, size: 0.6 });
   }
+
+  punch(pos, dir) {
+    this.bursts.emit(pos, { count: 26, color: { r: 0.95, g: 0.9, b: 0.7 }, speed: 3.2, spread: 0.6, lift: 0.7, gravity: 2, size: 0.5 });
+    const px = pos.x + (dir ? dir.x : 0) * 0.55;
+    const py = pos.y + 1.2;
+    const pz = pos.z + (dir ? dir.z : 0) * 0.55;
+    this.bursts.emit(new THREE.Vector3(px, py, pz), { count: 10, color: { r: 1, g: 0.75, b: 0.45 }, speed: 1.6, spread: 0.35, lift: 1.8, gravity: 1, size: 0.45 });
+  }
 }

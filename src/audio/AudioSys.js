@@ -206,6 +206,13 @@ export class AudioSys {
       case 'dash':
         this.noiseBurst(0.28, 600, 0.09);
         break;
+      case 'punch':
+        this.noiseBurst(0.09, 900, 0.1);
+        this.tone(-6, 0.12, t, 0.09, 1, 'sawtooth', 120);
+        break;
+      case 'whoosh':
+        this.noiseBurst(0.16, 1200, 0.04);
+        break;
       case 'chest':
         this.tone(0, 0.5, t, 0.07, 1, 'triangle', 440);
         setTimeout(() => this.tone(4, 0.7, t + 0.1, 0.07, 1, 'triangle', 440), 90);

@@ -9,6 +9,9 @@ export class Input {
     this.jumpPressed = false;
     this.jumpSpace = false;
     this.dashPressed = false;
+    this.runHeld = false;
+    this.crouchHeld = false;
+    this.attackPressed = false;
     this.interactPressed = false;
     this.lensPressed = false;
     this.mapPressed = false;
@@ -17,8 +20,6 @@ export class Input {
     this.camJoyX = 0;
     this.camJoyY = 0;
     this.camModePressed = false;
-    this.camModeSet = null;
-    this.inventoryPressed = false;
     this.camModeSet = null;
     this.inventoryPressed = false;
     // какой источник ввода вышел последним: так кнопки и джойстик работают
@@ -46,6 +47,18 @@ export class Input {
         this.preferTouch = true;
         if (down) this.dashPressed = true;
       };
+      this.touch.onRun = (down) => {
+        this.preferTouch = true;
+        this.runHeld = down;
+      };
+      this.touch.onCrouch = (down) => {
+        this.preferTouch = true;
+        this.crouchHeld = down;
+      };
+      this.touch.onAttack = () => {
+        this.preferTouch = true;
+        this.attackPressed = true;
+      };
     }
   }
 
@@ -72,6 +85,9 @@ export class Input {
         e.preventDefault();
       }
       if (k === 'shift') { this.dashPressed = true; }
+      if (k === 'ctrl') { this.runHeld = true; }
+      if (k === 'x' || k === 'ч') { this.crouchHeld = true; }
+      if (k === 'j' || k === 'о') { this.attackPressed = true; e.preventDefault(); }
       if (k === 'f' || k === 'а') { this.interactPressed = true; }
       if (k === 'q' || k === 'й') { this.camKeyHeld = -1; }
       if (k === 'e' || k === 'л') { this.camKeyHeld = 1; }
@@ -89,10 +105,12 @@ export class Input {
       const k = e.key.toLowerCase();
       this.keys.delete(k);
       if (k === ' ' || k === 'arrowup' || k === 'w') this.jumpHeld = false;
+      if (k === 'ctrl') this.runHeld = false;
+      if (k === 'x' || k === 'ч') this.crouchHeld = false;
       if (k === 'q' || k === 'й') { if (this.camKeyHeld === -1) this.camKeyHeld = 0; }
       if (k === 'e' || k === 'л') { if (this.camKeyHeld === 1) this.camKeyHeld = 0; }
     });
-    window.addEventListener('blur', () => { this.keys.clear(); this.jumpHeld = false; this.camKeyHeld = 0; this.camJoyX = 0; this.camJoyY = 0; });
+    window.addEventListener('blur', () => { this.keys.clear(); this.jumpHeld = false; this.runHeld = false; this.crouchHeld = false; this.camKeyHeld = 0; this.camJoyX = 0; this.camJoyY = 0; });
   }
 
   axis2D() {
@@ -109,12 +127,18 @@ export class Input {
 
   get dash() { return this._dash; }
   get jump() { return this._jump; }
+  get run() { return this._run; }
+  get crouch() { return this._crouch; }
+  get attack() { return this._attack; }
 
   consume() {
     const out = {
       jumpHeld: this.jumpHeld,
       jump: this.jumpPressed,
       dash: this.dashPressed || this.pressed.has('shift'),
+      run: this.runHeld,
+      crouch: this.crouchHeld,
+      attack: this.attackPressed,
       interact: this.interactPressed || this.pressed.has('f'),
       lens: this.lensPressed,
       map: this.mapPressed,
@@ -127,9 +151,13 @@ export class Input {
     };
     this._jump = out.jump;
     this._dash = out.dash;
+    this._run = out.run;
+    this._crouch = out.crouch;
+    this._attack = out.attack;
     this.jumpPressed = false;
     this.jumpSpace = false;
     this.dashPressed = false;
+    this.attackPressed = false;
     this.interactPressed = false;
     this.lensPressed = false;
     this.mapPressed = false;

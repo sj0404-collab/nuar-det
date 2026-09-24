@@ -9,7 +9,7 @@ const STEPS = [
   {
     id: 'move',
     title: 'Первые шаги',
-    text: 'Двигайтесь: джойстик слева внизу или WASD. Прыжок — ✦, рывок — ➤.',
+    text: 'Двигайтесь: джойстик слева внизу или WASD. Прыжок — ✦, рывок — ➤, бег — удерживайте «>», присед — «▬», удар — «⚔».',
     when: (g) => g.mode === 'explore' && !g.mount,
     done: (g) => !!(g.tutorial && g.tutorial.marksSwitches.moved),
   },

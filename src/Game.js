@@ -73,6 +73,7 @@ export class Game {
     this.glow.build(this.world);
 
     this.player = new Player(this.scene, this.effects, (s) => this.audio.sfx(s));
+    this.player.onAttack = (pos, dir) => this.playerAttack(pos, dir);
     this.player.applyBody(this.persona ? this.persona.body : null);
     const coll = this.world.getColliders();
     this.player.setColliders(coll.solids, coll.oneWays);
@@ -1825,6 +1826,39 @@ export class Game {
         this.hud.toast(tr.take === 'down' ? 'Спуск в цистерну' : 'Подъём на рынок');
         return;
       }
+    }
+  }
+
+  // удар кулаком: расталкивает прохожих вокруг и разгоняет виспов в радиусе
+  playerAttack(pos, dir) {
+    const range = 1.9;
+    const ang = 1.2;
+    if (this.world.peds) {
+      for (const ped of this.world.peds) {
+        if (ped.activity !== null || !ped.fig || !ped.fig.g) continue;
+        const fx = ped.fig.g.position.x, fz = ped.fig.g.position.z;
+        const dx = fx - pos.x, dz = fz - pos.z;
+        if (Math.hypot(dx, dz) > range) continue;
+        if (dir && Math.hypot(dx, dz) > 0.001) {
+          const dot = (dx * dir.x + dz * dir.z) / Math.hypot(dx, dz);
+          if (dot < -ang) continue;
+        }
+        ped.fig.g.position.x += dx * 0.45;
+        ped.fig.g.position.z += dz * 0.45;
+        ped._bump = 0.5;
+        this.audio.sfx('hit');
+      }
+    }
+    for (const w of this.wisps) {
+      if (w.dead) continue;
+      const dx = w.x - pos.x, dz = w.z - pos.z;
+      if (Math.hypot(dx, dz) > range + 0.4) continue;
+      w.x += dx * 0.8;
+      w.z += dz * 0.8;
+      w.mesh.position.x = w.x;
+      w.mesh.position.z = w.z;
+      this.effects.wispHit(new THREE.Vector3(w.x, 1.6, w.z));
+      this.audio.sfx('hit');
     }
   }
 
