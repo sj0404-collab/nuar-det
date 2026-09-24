@@ -31,6 +31,7 @@ export class VoiceEngine {
     this._edgeWs = null;
     this._edgeTimer = null;
     this._source = null;
+    this._queue = [];
     this.profile = localStorage.getItem('nuar_voice_profile') || '';
     // мост Android вызывает это в конце реплики
     try {
@@ -125,7 +126,17 @@ export class VoiceEngine {
   // вызывается нативным мостом Android, когда реплика договорена
   notifyDone() {
     if (this._ttsTimer) { clearTimeout(this._ttsTimer); this._ttsTimer = null; }
+    this._finishLine();
+  }
+
+  // текущая реплика договорена до конца (или её движок сменился):
+  // если в очереди есть следующая — озвучиваем её, реплики не обрываются
+  _finishLine() {
     this.speaking = false;
+    if (this._queue.length) {
+      const next = this._queue.shift();
+      if (next) this._dispatch(next.line, next.profile || {});
+    }
   }
 
   stop() {
@@ -137,6 +148,7 @@ export class VoiceEngine {
     if (bridge && typeof bridge.stop === 'function') { try { bridge.stop(); } catch (e) {} }
     this._cleanupEdge();
     this._killSynth();
+    this._queue = [];
     this.speaking = false;
   }
 
@@ -164,9 +176,20 @@ export class VoiceEngine {
     return parts.filter(Boolean);
   }
 
-  speak(line, profile = {}) {
+  speak(line, profile = {}, opts = {}) {
     if (!this.enabled || !line) return;
+    profile = profile || {};
+    // очередь: следующие реплики не обрывают текущую, а ждут её окончания
+    // (диалоги читаются по порядку, как в настоящем разговоре)
+    if (opts.queue && this.speaking) {
+      this._queue.push({ line, profile });
+      return;
+    }
     this.stop();
+    this._dispatch(line, profile);
+  }
+
+  _dispatch(line, profile = {}) {
     const mode = this.mode;
     if (mode === 'synth') { this._speakSynth(line, profile); return; }
     if (mode === 'google') {
@@ -199,7 +222,7 @@ export class VoiceEngine {
     if (!chunks.length) { cb(false); return; }
     let i = 0;
     const playNext = () => {
-      if (i >= chunks.length) { this.speaking = false; cb(true); return; }
+      if (i >= chunks.length) { this._finishLine(); cb(true); return; }
       const text = chunks[i++];
       this._googleChunk(text, profile, (ok) => {
         if (!ok) { this.speaking = false; cb(false); return; }
@@ -286,6 +309,7 @@ export class VoiceEngine {
     if (!this.supportedEdge) { cb(false); return; }
     if (this._edgeRelay) { this._relaySpeech(line, profile, cb); return; }
     this._edgePending = true;
+    this.speaking = true;
     const ws = new WebSocket(`${EDGE_WSS}?TrustedClientToken=${EDGE_TOKEN}&ConnectionId=${this._uuid()}`);
     this._edgeWs = ws;
     const chunks = [];
@@ -343,7 +367,7 @@ export class VoiceEngine {
     this._cleanupEdge();
     if (!chunks.length) { cb(false); return; }
     const mp3 = new Blob(chunks, { type: 'audio/mpeg' });
-    mp3.arrayBuffer().then((buf) => this._playBuf(buf, cb, 'edge')).catch(() => cb(false));
+    mp3.arrayBuffer().then((buf) => this._playBuf(buf, cb, 'edge', true)).catch(() => cb(false));
   }
 
   // self-hosted OpenAI-compatible Edge TTS relay (/v1/audio/speech)
@@ -365,11 +389,11 @@ export class VoiceEngine {
       if (!res.ok) throw new Error('relay ' + res.status);
       return res.arrayBuffer();
     }).then((buf) => {
-      this._playBuf(buf, cb, 'edge');
+      this._playBuf(buf, cb, 'edge', true);
     }).catch(() => cb(false));
   }
 
-  _playBuf(buf, cb, source) {
+  _playBuf(buf, cb, source, wholeLine = false) {
     if (source) this._markSource(source);
     const ctx = this.audio.ctx || (this.audio.init(), this.audio.ctx);
     if (!ctx) { cb(false); return; }
@@ -386,7 +410,11 @@ export class VoiceEngine {
         src.connect(g).connect(this.audio.master || ctx.destination);
         this.speaking = true;
         this._source = src;
-        src.onended = () => { this.speaking = false; this._source = null; };
+        src.onended = () => {
+          this.speaking = false;
+          this._source = null;
+          if (wholeLine) this._finishLine();
+        };
         if (ctx.state === 'suspended') ctx.resume();
         src.start();
         started = true;
@@ -435,7 +463,7 @@ export class VoiceEngine {
         const estMs = Math.max(1500, String(line).length * 95);
         this._ttsTimer = setTimeout(() => {
           this._ttsTimer = null;
-          if (this.speaking && this.lastSource === 'android') this.speaking = false;
+          if (this.speaking && this.lastSource === 'android') this._finishLine();
         }, estMs + 4000);
         return;
       }
@@ -452,7 +480,7 @@ export class VoiceEngine {
       const v = this._pickVoice(profile);
       if (v) u.voice = v;
       this._markSource('web');
-      u.onend = () => { this.speaking = false; };
+      u.onend = () => { this._finishLine(); };
       u.onerror = () => {
         this.speaking = false;
         this._speakSynth(line, profile);
@@ -504,7 +532,7 @@ export class VoiceEngine {
       t += sPerWord;
     }
     const end = t + 0.2;
-    this._synthTimer = setTimeout(() => { this.speaking = false; }, (end - ctx.currentTime) * 1000);
+    this._synthTimer = setTimeout(() => { this._finishLine(); }, (end - ctx.currentTime) * 1000);
   }
 
   _blip(ctx, p, word, i, n, t, dur, mood) {

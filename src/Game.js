@@ -848,6 +848,7 @@ export class Game {
 
   toTitle() {
     this.mode = 'title';
+    if (this.voice) this.voice.stop();
     this.screens.showTitle();
     document.getElementById('hud').classList.add('hidden');
     this.screens.hideMap();
@@ -978,6 +979,7 @@ export class Game {
   togglePause() {
     if (this.mode === 'explore') {
       this.mode = 'pause';
+      if (this.voice) this.voice.stop();
       this.screens.showPause();
     }
   }
@@ -1153,11 +1155,11 @@ export class Game {
     const chosen = this.dialogue.choices[i];
     this.dialogue.choose(i);
     if (this.dialogue.active) {
-      this.dialogueUI.render(this.dialogue);
       // реплика, которую произносит игрок, — голосом выбранной персоны
       if (chosen && this.voice && this.voice.enabled) {
-        this.voice.speak(chosen.label, this.persona ? this.persona.profile : null);
+        this.voice.speak(chosen.label, this.persona ? this.persona.profile : null, { queue: true });
       }
+      this.dialogueUI.render(this.dialogue);
     } else {
       this.dialogueUI.close();
       this.mode = 'explore';
@@ -1168,7 +1170,7 @@ export class Game {
 
   onDialogueSpeak(d) {
     if (!d || !d.text) return;
-    this.voice.speak(d.text, voiceFor(d.speaker));
+    this.voice.speak(d.text, voiceFor(d.speaker), { queue: true });
   }
 
   closeDialogue() {}
