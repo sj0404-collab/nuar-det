@@ -55,7 +55,7 @@ export class MapUI {
     ctx.font = '16px sans-serif';
     for (const it of world.items) {
       if (it.taken) continue;
-      const [ix, iy] = this.project(it.pos.x, it.pos.z - 40);
+      const [ix, iy] = this.project(it.pos.x, it.pos.z);
       ctx.fillText(it.icon || '★', ix, iy);
     }
 

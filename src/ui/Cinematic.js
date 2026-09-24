@@ -13,7 +13,6 @@ export class Cinematic {
     this.subEl = document.getElementById('intro-sub');
     this.capEl = document.getElementById('intro-cap');
     this.skipEl = document.getElementById('intro-skip');
-    this.barEl = document.getElementById('intro-bar');
     this.playing = false;
     this.shots = [];
     this.idx = 0;

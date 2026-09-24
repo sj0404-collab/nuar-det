@@ -140,6 +140,7 @@ export class Game {
       hasSave: () => this.hasSave(),
       saveInfo: () => this.saveInfoText(),
     });
+    this.screens.setHud(this.hud);
     this.screens.showTitle();
     this.screens.setCameraMode(this.cameraMode);
 

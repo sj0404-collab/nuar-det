@@ -281,18 +281,18 @@ function makeCab() {
 // routes: axis 'z' along world Z at fixed X; axis 'x' along X at fixed Z
 const ROUTES = [
   { axis: 'z', fixed: -3.0, min: -58, max: 38, dir: 1, speed: 2.1, rot: 0, cab: true, spawnBoost: 0 },
-  { axis: 'z', fixed: 3.4, min: 60, max: -56, dir: -1, speed: 2.9, rot: Math.PI, taxi: true, spawnBoost: 0 },
+  { axis: 'z', fixed: 3.4, min: -56, max: 60, dir: -1, speed: 2.9, rot: Math.PI, taxi: true, spawnBoost: 0 },
   { axis: 'z', fixed: -3.4, min: -60, max: 58, dir: 1, speed: 2.4, rot: 0, spawnBoost: 26 },
   { axis: 'z', fixed: 3.1, min: -56, max: 58, dir: 1, speed: 3.1, rot: 0, spawnBoost: -14 },
   { axis: 'z', fixed: -4.3, min: -64, max: 52, dir: -1, speed: 2.2, rot: Math.PI, tram: true, spawnBoost: 10 },
-  { axis: 'z', fixed: 3.8, min: 62, max: -52, dir: -1, speed: 2.7, rot: Math.PI, taxi: true, spawnBoost: 30 },
+  { axis: 'z', fixed: 3.8, min: -52, max: 62, dir: -1, speed: 2.7, rot: Math.PI, taxi: true, spawnBoost: 30 },
   // market alley (along X)
   { axis: 'x', fixed: 2.2, min: 16, max: 46, dir: 1, speed: 2.6, rot: -Math.PI / 2, spawnBoost: 0 },
-  { axis: 'x', fixed: -2.6, min: 44, max: 14, dir: -1, speed: 2.2, rot: Math.PI / 2, spawnBoost: 0 },
+  { axis: 'x', fixed: -2.6, min: 14, max: 44, dir: -1, speed: 2.2, rot: Math.PI / 2, spawnBoost: 0 },
   { axis: 'x', fixed: 2.6, min: 48, max: 102, dir: 1, speed: 2.0, rot: -Math.PI / 2, spawnBoost: -20 },
   // harbor road (along Z)
   { axis: 'z', fixed: 180, min: 46, max: 80, dir: 1, speed: 3.0, rot: 0, spawnBoost: 0 },
-  { axis: 'z', fixed: 192, min: 78, max: 44, dir: -1, speed: 2.5, rot: Math.PI, taxi: true, spawnBoost: -12 },
+  { axis: 'z', fixed: 192, min: 44, max: 78, dir: -1, speed: 2.5, rot: Math.PI, taxi: true, spawnBoost: -12 },
 ];
 
 export function buildTraffic(world) {

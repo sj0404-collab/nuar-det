@@ -160,6 +160,12 @@ export class Screens {
 
     // voice profile selector
     this.voiceProfileSelect = document.getElementById('voice-profile-select');
+    if (this.voiceProfileSelect) {
+      this.voiceProfileSelect.addEventListener('change', (e) => {
+        localStorage.setItem('nuar_voice_profile', e.target.value);
+        this.hooks.onVoiceProfileChange && this.hooks.onVoiceProfileChange(e.target.value);
+      });
+    }
     this.refreshVoiceProfiles();
 
     const previewBtn = document.getElementById('btn-voice-preview');
@@ -245,10 +251,6 @@ export class Screens {
     if (savedProfile && list.includes(savedProfile)) {
       this.voiceProfileSelect.value = savedProfile;
     }
-    this.voiceProfileSelect.addEventListener('change', (e) => {
-      localStorage.setItem('nuar_voice_profile', e.target.value);
-      this.hooks.onVoiceProfileChange && this.hooks.onVoiceProfileChange(e.target.value);
-    });
   }
 
   showTitle() { this.title.classList.remove('hidden'); this.credits.classList.add('hidden'); this.pause.classList.add('hidden'); this.settings.classList.add('hidden'); this.map.classList.add('hidden'); if (this._refreshSound) this._refreshSound(); if (this._refreshVoice) this._refreshVoice(); if (this._refreshTime) this._refreshTime(); this.refreshSave(); this.refreshPersona(); }

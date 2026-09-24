@@ -78,7 +78,7 @@ export class Input {
       if (k === 'l' || k === 'д') { this.lensPressed = true; }
       if (k === 'tab' || k === 'm' || k === 'ь') { this.mapPressed = true; e.preventDefault(); }
       if (k === 'escape' || k === 'p' || k === 'з') { this.pausePressed = true; }
-      if (k === 'c') { this.deckPressed = true; }
+      if (k === 'c') { this.deckPressed = true; this.inventoryPressed = true; }
       if (k === 'v') { this.camModePressed = true; }
       if (k === '1') { this.camModeSet = 'orbit'; }
       if (k === '2') { this.camModeSet = 'top'; }

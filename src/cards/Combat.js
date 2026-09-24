@@ -86,26 +86,22 @@ export class Combat {
 
     if (fx.type === 'atk') {
       let dmg = fx.val;
-      if (this.enemy.stunTurns <= 0) {
-        if (!fx.pierce && this.enemy.block > 0) {
-          const absorbed = Math.min(this.enemy.block, dmg);
-          this.enemy.block -= absorbed;
-          dmg -= absorbed;
-          events.push(`Защита врага поглотила ${absorbed}.`);
-        }
-        this.enemy.hp = Math.max(0, this.enemy.hp - dmg);
-        events.push(`${card.name}: −${dmg} ❤️ ${this.enemy.name}`);
-        this.enemy.clues += fx.clue || 0;
-        if (fx.draw) { this.draw(); events.push('+1 карта'); }
-        if (fx.clue && this.enemy.clues >= 3) {
-          this.enemy.stunTurns = Math.max(this.enemy.stunTurns, 1);
-          events.push('Улик набралось — враг оглушён!');
-          this.enemy.clues = 0;
-        }
-        if (this.enemy.hp <= 0) this.finishWin();
-      } else {
-        events.push('Враг оглушён и пропускает ход.');
+      if (!fx.pierce && this.enemy.block > 0) {
+        const absorbed = Math.min(this.enemy.block, dmg);
+        this.enemy.block -= absorbed;
+        dmg -= absorbed;
+        events.push(`Защита врага поглотила ${absorbed}.`);
       }
+      this.enemy.hp = Math.max(0, this.enemy.hp - dmg);
+      events.push(`${card.name}: −${dmg} ❤️ ${this.enemy.name}`);
+      this.enemy.clues += fx.clue || 0;
+      if (fx.draw) { this.draw(); events.push('+1 карта'); }
+      if (fx.clue && this.enemy.clues >= 3) {
+        this.enemy.stunTurns = Math.max(this.enemy.stunTurns, 1);
+        events.push('Улик набралось — враг оглушён!');
+        this.enemy.clues = 0;
+      }
+      if (this.enemy.hp <= 0) this.finishWin();
     } else if (fx.type === 'block') {
       this.playerBlock += fx.val;
       events.push(`${card.name}: +${fx.val} защиты`);
