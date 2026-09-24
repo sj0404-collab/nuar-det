@@ -9,14 +9,14 @@ const STEPS = [
   {
     id: 'move',
     title: 'Первые шаги',
-    text: 'Двигайтесь: джойстик слева внизу или WASD. Прыжок — ✦, рывок — ➤, бег — удерживайте «>», присед — «▬», удар — «⚔».',
+    text: (g) => `Двигайтесь: ${g.input.ctrl.move}. Прыжок — ${g.input.ctrl.jump}, рывок — ${g.input.ctrl.dash}, бег — ${g.input.ctrl.run}, присед — ${g.input.ctrl.crouch}, удар — ${g.input.ctrl.attack}.`,
     when: (g) => g.mode === 'explore' && !g.mount,
     done: (g) => !!(g.tutorial && g.tutorial.marksSwitches.moved),
   },
   {
     id: 'camera',
     title: 'Камера',
-    text: 'Правый джойстик или Q/E — поворот камеры. Клавиша V переключает вид: обзор, от первого лица, сверху.',
+    text: (g) => `${g.input.ctrl.camera}. ${g.input.ctrl.cameraMode} переключает вид: обзор, от первого лица, сверху.`,
     when: (g) => g.mode === 'explore',
     done: (g) => !!(g.tutorial && g.tutorial.marksSwitches.camera),
   },
@@ -30,14 +30,14 @@ const STEPS = [
   {
     id: 'item',
     title: 'Улики',
-    text: 'Подойдите к светящейся улике и нажмите F или кнопку «!» — улика попадёт в блокнот.',
+    text: (g) => `Подойдите к светящейся улике и нажмите ${g.input.ctrl.interact} — улика попадёт в блокнот.`,
     when: (g) => g.mode === 'explore' && !g.mount,
     done: (g) => g.player.inventory.size > 0,
   },
   {
     id: 'key',
     title: 'Ключи и двери',
-    text: 'Ключи-улики открывают двери, которые запирают туман. Подойдите к двери и нажмите F.',
+    text: (g) => `Ключи-улики открывают двери, которые запирает туман. Подойдите к двери и нажмите ${g.input.ctrl.interact}.`,
     when: (g) => g.mode === 'explore' && g.player.inventory.has('key_bar') === false && g.player.inventory.size > 0,
     done: (g) => g.gates.some((x) => !x.locked) || g.player.inventory.has('key_gate'),
   },
@@ -65,7 +65,7 @@ const STEPS = [
   {
     id: 'transport',
     title: 'Транспорт',
-    text: 'Фиакры возят по городу. При посадке выберите место: Водитель — вы управляете (W/S газ, A/D поворот), Пассажир — едете сами.',
+    text: (g) => `Фиакры возят по городу. При посадке выберите место: Водитель — вы управляете (${g.input.ctrl.move} — газ/поворот), Пассажир — едете сами.`,
     when: (g) => g.mode === 'explore' && !g.mount && !!g.findVehicleNear(),
     done: (g) => !!(g.tutorial && g.tutorial.marksSwitches.transport),
   },
@@ -175,7 +175,7 @@ export class Tutorial {
     const t = this.el.querySelector('#tutorial-text');
     const h = this.el.querySelector('#tutorial-title');
     if (h) h.textContent = step.title;
-    if (t) t.textContent = step.text;
+    if (t) t.textContent = typeof step.text === 'function' ? step.text(this.game) : step.text;
   }
 }
 

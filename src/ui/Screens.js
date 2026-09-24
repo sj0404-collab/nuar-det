@@ -294,7 +294,20 @@ export class Screens {
     const btns = document.querySelectorAll('.persona-btn');
     btns.forEach((b) => b.classList.toggle('active', b.dataset.persona === id));
   }
-  showCredits() { this.credits.classList.remove('hidden'); this.title.classList.remove('hidden'); }
+  showCredits() {
+    // показываем только ту строку подсказок, которая подходит под устройство:
+    // сенсор — тач, геймпад — кнопки Xbox, иначе клавиатура
+    const pad = navigator.getGamepads && Array.from(navigator.getGamepads()).find((p) => p && p.connected);
+    const touch = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
+    const pc = document.getElementById('help-controls');
+    const tp = document.getElementById('help-touch');
+    const gp = document.getElementById('help-gamepad');
+    if (pad) { if (pc) pc.classList.add('hidden'); if (tp) tp.classList.add('hidden'); if (gp) gp.classList.remove('hidden'); }
+    else if (touch) { if (pc) pc.classList.add('hidden'); if (tp) tp.classList.remove('hidden'); if (gp) gp.classList.add('hidden'); }
+    else { if (pc) pc.classList.remove('hidden'); if (tp) tp.classList.add('hidden'); if (gp) gp.classList.add('hidden'); }
+    this.credits.classList.remove('hidden');
+    this.title.classList.remove('hidden');
+  }
   hideTitle() { this.title.classList.add('hidden'); }
   showPause() { this.pause.classList.remove('hidden'); this.settings.classList.add('hidden'); if (this._refreshTime) this._refreshTime(); this.refreshSave(); }
   hidePause() { this.pause.classList.add('hidden'); }

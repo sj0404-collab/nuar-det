@@ -807,7 +807,7 @@ export class Game {
     this.player.abilities.lens = false;
     this.updateHud();
     this.hud.toast('Дело №7: «Фонарь Моррова». Удачи, ' + this.persona.label + '.');
-    this.hud.showHint('ПК: W/A/S/D — движение, Пробел — прыжок, F — взаимодействие. Мобилка: джойстик слева.', true);
+    this.hud.showHint(`${this.input.ctrl.moveLong}. ${this.input.ctrl.jumpLong}, ${this.input.ctrl.dash} — рывок, ${this.input.ctrl.interact} — взаимодействие.`, true);
     setTimeout(() => this.hud.hideHint(), 5000);
   }
 
@@ -838,7 +838,7 @@ export class Game {
     this.updateHud();
     this.hud.setCase('Свободный город · ' + this.persona.label);
     this.hud.toast('Режим исследования: город Ноктис открыт. Играйте за ' + this.persona.label + ' — всё разрешено.');
-    this.hud.showHint('Прыжок — дважды для двойного, Shift — рывок, F — общение. Пробуйте транспорт и все уголки города.', true);
+    this.hud.showHint(`${this.input.ctrl.jumpLong}, ${this.input.ctrl.dash} — рывок, ${this.input.ctrl.interact} — общение. Пробуйте транспорт и все уголки города.`, true);
     setTimeout(() => this.hud.hideHint(), 6000);
   }
 
@@ -1118,10 +1118,10 @@ export class Game {
     }
     const tools = [];
     const ab = this.player.abilities;
-    if (ab.dash) tools.push({ icon: '➤', name: 'Дымополёт', meta: 'рывок', desc: 'Рывок вперёд (Shift)' });
+    if (ab.dash) tools.push({ icon: '➤', name: 'Дымополёт', meta: 'рывок', desc: `Рывок вперёд (${this.input.ctrl.dash})` });
     if (ab.jump) tools.push({ icon: '✦', name: 'Двоение тени', meta: 'способность', desc: 'Двойной прыжок в воздухе' });
     if (ab.wall) tools.push({ icon: '🕸', name: 'Свод теней', meta: 'способность', desc: 'Выход на стены и потолки' });
-    if (ab.lens) tools.push({ icon: '🔍', name: 'Зрение личины', meta: 'способность', desc: 'Следы и улики светятся (L)' });
+    if (ab.lens) tools.push({ icon: '🔍', name: 'Зрение личины', meta: 'способность', desc: `Следы и улики светятся (${this.input.ctrl.lens})` });
     return { deck, clues, tools };
   }
 
@@ -1325,7 +1325,7 @@ export class Game {
     if (!asDriver && m.veh.baseSpeed !== undefined) m.veh.speed = m.veh.baseSpeed;
     m.driver = asDriver;
     m.seatOffset = asDriver ? 0 : 0.7;
-    this.hud.toast(asDriver ? 'Вы пересели за руль. W/S — газ, A/D — поворот.' : 'Вы пересели на пассажирское место.');
+    this.hud.toast(asDriver ? `Вы пересели за руль. ${this.input.ctrl.move} — газ/поворот.` : 'Вы пересели на пассажирское место.');
     this.audio.sfx('ui');
   }
 
@@ -1344,8 +1344,8 @@ export class Game {
       seatOffset: asDriver ? 0 : 0.7,
     };
     this.hud.toast(asDriver
-      ? 'Вы за рулём! W/S — газ и тормоз, A/D — поворот, выход — F или пробел.'
-      : 'Вы пассажир. Транспорт едет по маршруту, выход — F или пробел.');
+      ? `Вы за рулём! ${this.input.ctrl.move} — газ/тормоз/поворот, выход — ${this.input.ctrl.interact} или ${this.input.ctrl.jump}.`
+      : `Вы пассажир. Транспорт едет по маршруту, выход — ${this.input.ctrl.interact} или ${this.input.ctrl.jump}.`);
     this.audio.sfx('chest');
   }
 
@@ -1759,8 +1759,10 @@ export class Game {
     let near = null;
     if (this.mount) {
       near = { text: this.mount.veh.cab
-        ? (this.mount.driver ? 'За рулём: W/S газ, A/D поворот · F — пересесть, пробел — выйти' : 'Пассажир: F — пересесть за руль, пробел — выйти')
-        : 'Выйти из транспорта — F или пробел', interact: true };
+        ? (this.mount.driver
+          ? `За рулём: ${this.input.ctrl.move} — газ/поворот · ${this.input.ctrl.interact} — пересесть, ${this.input.ctrl.jump} — выйти`
+          : `Пассажир: ${this.input.ctrl.interact} — пересесть за руль, ${this.input.ctrl.jump} — выйти`)
+        : `Выйти из транспорта — ${this.input.ctrl.interact} или ${this.input.ctrl.jump}`, interact: true };
     } else {
       for (const n of this.world.npcs) {
         const dx = p.x - n.pos.x, dz = p.z - n.pos.z;
