@@ -48,6 +48,12 @@ export class TouchControls {
     localStorage.setItem('nuar_invert_joy', this.invertJoy ? '1' : '0');
   }
 
+  getJoyRadius(base, thumb) {
+    const baseSize = base.getBoundingClientRect().width;
+    const thumbSize = thumb.getBoundingClientRect().width;
+    return Math.max(1, (baseSize - thumbSize) / 2 - 2);
+  }
+
   get isTouch() {
     return this.active || ('ontouchstart' in window && window.matchMedia('(pointer: coarse)').matches);
   }
@@ -95,6 +101,7 @@ export class TouchControls {
     this.camJoyPointer = e.pointerId;
     const r = this.camJoyBase.getBoundingClientRect();
     this.camJoyCenter = { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+    this.camJoyRadius = this.getJoyRadius(this.camJoyBase, this.camJoyThumb);
     this.camJoyZone.setPointerCapture(e.pointerId);
     this.camVec.x = 0; this.camVec.y = 0;
     this.onCamJoy && this.onCamJoy(0, 0);
@@ -131,6 +138,7 @@ export class TouchControls {
     this.joyPointer = e.pointerId;
     const r = this.joyBase.getBoundingClientRect();
     this.joyCenter = { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+    this.joyRadius = this.getJoyRadius(this.joyBase, this.joyThumb);
     this.joyZone.setPointerCapture(e.pointerId);
     this.moveJoy(e);
     this.vec.x = 0; this.vec.y = 0;

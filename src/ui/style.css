@@ -81,10 +81,12 @@ canvas#game-canvas { position: absolute; inset: 0; width: 100%; height: 100%; di
 }
 .ability-ico.owned { color: var(--mint); border-color: rgba(126,224,200,0.6); box-shadow: 0 0 8px rgba(126,224,200,0.25); }
 #right-panel { display: flex; gap: 8px; pointer-events: auto; flex: 0 0 auto; margin-left: auto; }
+#utility-buttons { display: flex; gap: 8px; }
 .icon-btn {
-  width: 46px; height: 46px; font-size: 19px; border-radius: 8px; cursor: pointer;
+  width: 46px; height: 46px; padding: 0; font-size: 19px; border-radius: 8px; cursor: pointer;
   background: rgba(5,8,12,0.65); border: 1px solid rgba(212,165,89,0.4); color: var(--parch);
-  backdrop-filter: blur(4px); touch-action: manipulation;
+  backdrop-filter: blur(4px); touch-action: manipulation; display: grid; place-items: center;
+  line-height: 1; overflow: hidden; white-space: nowrap;
 }
 .icon-btn:active { transform: scale(0.92); background: rgba(212,165,89,0.25); }
 
@@ -177,9 +179,9 @@ canvas#game-canvas { position: absolute; inset: 0; width: 100%; height: 100%; di
 }
 #act-buttons { position: absolute; right: calc(14px + var(--safe-r)); bottom: calc(60px + var(--safe-b)); display: flex; gap: 10px; pointer-events: auto; align-items: flex-end; flex-wrap: wrap-reverse; justify-content: flex-end; max-width: 46vw; }
 .act-btn {
-  width: 70px; height: 70px; border-radius: 50%; font-size: 28px; cursor: pointer; color: var(--parch);
+  width: 70px; height: 70px; padding: 0; border-radius: 50%; font-size: 28px; cursor: pointer; color: var(--parch);
   background: rgba(10,16,24,0.4); border: 1.5px solid rgba(233,220,192,0.4); backdrop-filter: blur(4px);
-  touch-action: manipulation;
+  touch-action: manipulation; display: grid; place-items: center; line-height: 1; overflow: hidden;
 }
 .act-btn:active { transform: scale(0.9); }
 #btn-dash { width: 60px; height: 60px; font-size: 22px; }
@@ -450,27 +452,48 @@ body.in-combat #hint { display: none !important; }
   #rotate-hint { display: flex; }
 }
 
-@media (orientation: portrait) and (max-width: 640px) {
-  #joy-base { left: calc(16px + var(--safe-l)); bottom: calc(96px + var(--safe-b)); width: 108px; height: 108px; }
-  #joy-thumb { left: 36px; top: 36px; width: 36px; height: 36px; }
-  #act-buttons { right: calc(12px + var(--safe-r)); bottom: calc(50px + var(--safe-b)); gap: 10px; }
-  .act-btn { width: 60px; height: 60px; font-size: 24px; }
-  #btn-dash { width: 52px; height: 52px; font-size: 19px; }
-  #btn-run, #btn-crouch { width: 54px; height: 54px; font-size: 22px; }
-  #btn-attack { width: 58px; height: 58px; font-size: 24px; }
-  #cam-joy-base { right: calc(14px + var(--safe-r)); bottom: calc(150px + var(--safe-b)); width: 100px; height: 100px; }
+@media (orientation: portrait) and (max-width: 900px) {
+  #top-bar {
+    display: grid; grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+    align-items: start; gap: 6px; padding: 0 6px;
+  }
+  #left-panel { min-width: 0; gap: 4px; }
+  #case-label { max-width: 100%; font-size: 10px; line-height: 1.25; letter-spacing: 1.2px; padding: 4px 7px; }
+  #hud-clock { transform: scale(0.86); transform-origin: left top; margin-bottom: -6px; }
+  .clock-dial { width: 34px; height: 34px; }
+  #clock-digital { font-size: 10px; min-width: 50px; }
+  #clock-icon { font-size: 12px; }
+  #logs, #abilities { display: none; }
+  #right-panel {
+    width: 100%; min-width: 0; margin-left: 0; flex-direction: column; align-items: stretch; gap: 4px;
+  }
+  #cam-switch, #utility-buttons {
+    display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; width: 100%;
+  }
+  #right-panel .icon-btn { width: 100%; min-width: 0; height: 38px; border-radius: 6px; font-size: 13px; }
+  #right-panel .cam-btn { padding: 0 2px; font-size: 10px; letter-spacing: 0; }
+  #joy-base { left: calc(14px + var(--safe-l)); bottom: calc(64px + var(--safe-b)); width: 104px; height: 104px; }
+  #joy-thumb { left: 34px; top: 34px; width: 36px; height: 36px; }
+  #cam-joy-zone { right: calc(12px + var(--safe-r)); bottom: calc(174px + var(--safe-b)); width: 112px; height: 112px; }
+  #cam-joy-base { right: 6px; bottom: 6px; width: 100px; height: 100px; }
   #cam-joy-thumb { left: 32px; top: 32px; width: 36px; height: 36px; }
-  #btn-interact { right: calc(92px + var(--safe-r)); bottom: calc(152px + var(--safe-b)); width: 58px; height: 58px; }
+  #act-buttons {
+    right: calc(12px + var(--safe-r)); bottom: calc(44px + var(--safe-b)); display: grid;
+    grid-template-columns: repeat(3, 54px); grid-template-rows: repeat(2, 54px); gap: 6px;
+    width: auto; max-width: none; align-items: center; justify-items: center;
+    grid-template-areas: "attack crouch run" "dash jump interact";
+  }
+  #btn-attack { grid-area: attack; }
+  #btn-crouch { grid-area: crouch; }
+  #btn-run { grid-area: run; }
+  #btn-dash { grid-area: dash; }
+  #btn-jump { grid-area: jump; }
+  #btn-interact { grid-area: interact; position: static; }
   #hint { bottom: calc(4px + var(--safe-b)); font-size: 12px; padding: 6px 12px; }
-  .icon-btn { width: 44px; height: 44px; font-size: 18px; }
-  #top-bar { padding: 0 6px; }
-  #case-label { font-size: 11px; padding: 4px 8px; }
   .log-chip { font-size: 10px; padding: 3px 8px; }
   .ability-ico { width: 26px; height: 26px; font-size: 13px; }
-  #dialogue-box { bottom: calc(96px + var(--safe-b)); padding: 12px 14px; }
-  #minimap-wrap { width: 100px; height: 100px; top: calc(112px + var(--safe-t)); }
-  /* логи на узком экране прячем, чтобы не выталкивали иконки */
-  #logs { display: none; }
+  #dialogue-box { bottom: calc(88px + var(--safe-b)); padding: 12px 14px; }
+  #minimap-wrap { width: 94px; height: 94px; top: calc(104px + var(--safe-t)); }
 }
 
 /* ---------- Бой на телефоне ---------- */
@@ -511,6 +534,17 @@ body.in-combat #hint { display: none !important; }
   #btn-attack { width: 70px; height: 70px; font-size: 28px; }
   #btn-interact { width: 66px; height: 66px; }
   input[type="range"] { height: 40px; }
+}
+
+@media (orientation: portrait) and (pointer: coarse) {
+  .act-btn,
+  #btn-dash,
+  #btn-run,
+  #btn-crouch,
+  #btn-attack,
+  #btn-interact { width: 52px; height: 52px; font-size: 22px; }
+  #cam-joy-zone { z-index: 2; }
+  #act-buttons { z-index: 3; }
 }
 
 @media (max-width: 640px) {
@@ -573,3 +607,8 @@ body.in-combat #hint { display: none !important; }
 .choice-box h3 { color: var(--gold); margin-bottom: 8px; letter-spacing: 2px; }
 .choice-box p { color: var(--fog); margin-bottom: 18px; }
 .choice-box .menu-btn { width: 100%; }
+
+@media (orientation: portrait) and (max-width: 900px) {
+  #minimap-wrap { top: calc(104px + var(--safe-t)); width: 94px; height: 94px; }
+  #tutorial-tip { bottom: calc(292px + var(--safe-b)); }
+}

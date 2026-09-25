@@ -164,31 +164,31 @@ export class Player {
     knot.position.set(0, 0.14, -0.04);
     this.scarf.add(knot);
 
-    // костяная лента: каждый сегмент — тонкая пластинка, шарнир на задней кромке
-    // предыдущего; углы с шагом растут к кончику, волна бежит наружу — ткань, а не палка
-    const SCARF_SEGS = 12;
-    const LINK_LEN = 0.13;
-    const linkGeo = flatGeometry(new THREE.BoxGeometry(0.088, 0.014, LINK_LEN, 2, 1, 2));
-    const tipGeo = flatGeometry(new THREE.BoxGeometry(0.058, 0.012, LINK_LEN, 2, 1, 2));
+    const SCARF_SEGS = 10;
+    const LINK_LEN = 0.1;
+    const linkGeo = flatGeometry(new THREE.BoxGeometry(0.12, 0.016, LINK_LEN, 2, 1, 2));
+    const tipGeo = flatGeometry(new THREE.BoxGeometry(0.085, 0.014, LINK_LEN, 2, 1, 2));
+    this.scarfAnchor = new THREE.Vector3(0, 0, -0.12);
+    this.scarfDirection = new THREE.Vector3(0, 0, -1);
+    this.scarfDelta = new THREE.Vector3();
+    this.scarfPoint = new THREE.Vector3();
     this.scarfSegs = [];
-    let rootZ = -0.12;
     for (let i = 0; i < SCARF_SEGS; i++) {
       const linkG = new THREE.Group();
       const link = new THREE.Mesh(i === SCARF_SEGS - 1 ? tipGeo : linkGeo, i === SCARF_SEGS - 1 ? scarfGlowMat : scarfMat);
       link.position.z = -LINK_LEN / 2;
       linkG.add(link);
-      linkG.position.set(0, 0, rootZ);
-      linkG.rotation.x = 0.08;
       this.scarf.add(linkG);
       this.scarfSegs.push({
         g: linkG,
-        cur: 0.08,
-        droop: 0.06 + (i / SCARF_SEGS) * 0.6,
-        phase: i * 0.85,
-        swayPhase: i * 0.7,
+        pitch: -0.08 - i * 0.01,
+        pitchVelocity: 0,
+        sway: 0,
+        swayVelocity: 0,
+        phase: i * 0.73,
       });
-      rootZ -= LINK_LEN;
     }
+    this.scarfLinkLength = LINK_LEN;
     this.scarf.position.y = 1.0;
     bodyG.add(this.scarf);
     this.scarfYaw = Math.PI;
@@ -405,6 +405,47 @@ export class Player {
     if (jumping) this.dashSpark = 0.25;
   }
 
+  updateScarf(dt, t, speed, verticalVelocity) {
+    const step = Math.min(dt, 1 / 30);
+    const count = this.scarfSegs.length;
+    const motionLift = Math.min(speed * 0.065, 0.78);
+    const airShift = Math.max(-0.28, Math.min(0.32, -verticalVelocity * 0.022));
+    for (let i = 0; i < count; i++) {
+      const s = this.scarfSegs[i];
+      const tail = (i + 1) / count;
+      const restPitch = -0.62 - tail * 0.62 - Math.sin(tail * Math.PI) * 0.12;
+      const targetPitch = restPitch + motionLift + airShift;
+      const gravityTorque = -8 * Math.cos(s.pitch);
+      const bendSpring = (targetPitch - s.pitch) * 12;
+      s.pitchVelocity += (gravityTorque + bendSpring - s.pitchVelocity * 6.2) * step;
+      s.pitch += s.pitchVelocity * step;
+      if (s.pitch < -1.52) {
+        s.pitch = -1.52;
+        s.pitchVelocity = Math.max(0, s.pitchVelocity);
+      } else if (s.pitch > 0.2) {
+        s.pitch = 0.2;
+        s.pitchVelocity = Math.min(0, s.pitchVelocity);
+      }
+      const swayTarget = Math.sin(t * 3.1 + s.phase) * (0.05 + tail * 0.1) * (0.5 + Math.min(speed, 12) * 0.06);
+      s.swayVelocity += ((swayTarget - s.sway) * 12 - s.swayVelocity * 5) * step;
+      s.sway += s.swayVelocity * step;
+      s.sway = Math.max(-0.32, Math.min(0.32, s.sway));
+    }
+
+    this.scarfPoint.copy(this.scarfAnchor);
+    for (let i = 0; i < count; i++) {
+      const s = this.scarfSegs[i];
+      const tail = (i + 1) / count;
+      const horizontal = Math.cos(s.pitch);
+      this.scarfDelta.set(Math.sin(s.sway) * horizontal, Math.sin(s.pitch), -Math.cos(s.sway) * horizontal).normalize();
+      s.g.position.copy(this.scarfPoint);
+      s.g.quaternion.setFromUnitVectors(this.scarfDirection, this.scarfDelta);
+      s.g.rotateY(Math.sin(t * 4.2 + s.phase) * 0.12 * tail);
+      s.g.scale.x = 1 + Math.sin(t * 4.2 + s.phase) * (0.04 + tail * 0.08);
+      this.scarfPoint.addScaledVector(this.scarfDelta, this.scarfLinkLength);
+    }
+  }
+
   animate(dt, speed, vy) {
     const t = performance.now() / 1000;
     const walk = this.grounded && speed > 0.6;
@@ -464,19 +505,7 @@ export class Player {
     while (yawD < -Math.PI) yawD += Math.PI * 2;
     this.scarfYaw += yawD * Math.min(1, dt * 4.5);
     this.scarf.rotation.y = this.scarfYaw - this.mesh.rotation.y;
-    // cloth wave: droop grows toward the tip, a travelling wave and a gust of
-    // wind lift and sway each hinge; dashing streams the tail behind flat
-    const wind = 0.6 + 0.4 * Math.sin(t * 0.95);
-    const leanK = 1 - lean * 0.6;
-    for (let i = 0; i < this.scarfSegs.length; i++) {
-      const s = this.scarfSegs[i];
-      const k = i / this.scarfSegs.length;
-      const wave = Math.sin(t * 7.5 - s.phase) * (0.05 + k * 0.19) * wind;
-      const target = s.droop * leanK + wave;
-      s.cur += (target - s.cur) * Math.min(1, dt * 7);
-      s.g.rotation.x = s.cur;
-      s.g.rotation.z = Math.sin(t * 3.4 + s.swayPhase) * 0.06 * wind * (0.3 + k * 0.7);
-    }
+    this.updateScarf(dt, t, speed, vy);
     this.scarf.position.y = 1.0 + Math.sin(t * 5) * 0.015;
 
     // squash on landing
