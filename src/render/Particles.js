@@ -14,6 +14,21 @@ export function makeSoftTexture(inner = 'rgba(255,255,255,1)', outer = 'rgba(255
   return tex;
 }
 
+function makeRainTexture() {
+  const c = document.createElement('canvas');
+  c.width = 16;
+  c.height = 64;
+  const ctx = c.getContext('2d');
+  const g = ctx.createLinearGradient(0, 0, 0, 64);
+  g.addColorStop(0, 'rgba(225,240,255,0)');
+  g.addColorStop(0.22, 'rgba(225,240,255,1)');
+  g.addColorStop(0.72, 'rgba(235,248,255,0.95)');
+  g.addColorStop(1, 'rgba(235,248,255,0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(3, 0, 10, 64);
+  return new THREE.CanvasTexture(c);
+}
+
 const PARTICLE_VERT = `
   attribute float aSize;
   attribute float aAlpha;
@@ -39,14 +54,14 @@ const PARTICLE_FRAG = `
   }
 `;
 
-function makePointsMaterial(map) {
+function makePointsMaterial(map, blending = THREE.AdditiveBlending) {
   return new THREE.ShaderMaterial({
     uniforms: { uMap: { value: map } },
     vertexShader: PARTICLE_VERT,
     fragmentShader: PARTICLE_FRAG,
     transparent: true,
     depthWrite: false,
-    blending: THREE.AdditiveBlending,
+    blending,
   });
 }
 
@@ -56,9 +71,13 @@ function makePointsMaterial(map) {
 //           'ember' hot motes rising (additive flicker)
 //           'mote'  slow rising glow (cistern)
 class ParticleField {
-  constructor(scene, { behavior, count = 100, area = { x: 260, z: 230 }, anchor }) {
+  constructor(scene, { behavior, count = 100, area = { x: 260, z: 230 }, anchor, texture, blending }) {
     this.behavior = behavior;
     this.count = count;
+    this.activeCount = count;
+    this.intensity = 1;
+    this.windX = 0;
+    this.windZ = 0;
     this.anchor = anchor || { x: 0, y: 0, z: 0 };
     this.area = area;
 
@@ -80,7 +99,7 @@ class ParticleField {
     geo.setAttribute('aAlpha', new THREE.BufferAttribute(this.alphas, 1));
     geo.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 1000);
 
-    this.points = new THREE.Points(geo, makePointsMaterial(makeSoftTexture()));
+    this.points = new THREE.Points(geo, makePointsMaterial(texture || makeSoftTexture(), blending));
     this.points.frustumCulled = false;
     this.points.renderOrder = 5;
     scene.add(this.points);
@@ -119,8 +138,8 @@ class ParticleField {
         vy = -24 - Math.random() * 7;
         vz = 0.2 + Math.random() * 0.5;
         maxLife = 2.5;
-        size = 0.28 + Math.random() * 0.4;
-        color = [0.5, 0.58, 0.7];
+        size = 1.1 + Math.random() * 1.0;
+        color = [0.72, 0.84, 0.98];
         break;
       }
       case 'ember': {
@@ -183,13 +202,17 @@ class ParticleField {
       if (Math.abs(bx) > this.area.x || Math.abs(bz) > this.area.z) {
         this.base[j] = this.anchor.x + (Math.random() * 2 - 1) * this.area.x;
         this.base[j + 2] = this.anchor.z + (Math.random() * 2 - 1) * this.area.z;
+        if (this.behavior === 'rain') {
+          this.positions[j] = this.base[j];
+          this.positions[j + 1] = this.anchor.y + 16 + Math.random() * 14;
+          this.positions[j + 2] = this.base[j + 2];
+        }
       }
     }
   }
 
   update(dt, t, camPos) {
-    const jmax = this.count * 3;
-    for (let i = 0; i < this.count; i++) {
+    for (let i = 0; i < this.activeCount; i++) {
       const j = i * 3;
       const ageFactor = 1.0;
       this.life[i] += dt;
@@ -202,9 +225,9 @@ class ParticleField {
           break;
         }
         case 'rain': {
-          this.positions[j] += this.vel[j] * dt;
+          this.positions[j] += (this.vel[j] + this.windX) * dt;
           this.positions[j + 1] += this.vel[j + 1] * dt;
-          this.positions[j + 2] += this.vel[j + 2] * dt;
+          this.positions[j + 2] += (this.vel[j + 2] + this.windZ) * dt;
           if (this.positions[j + 1] < camPos.y + 1) {
             this.spawn(i, t);
             this.positions[j + 1] = camPos.y + 16 + Math.random() * 14;
@@ -241,7 +264,7 @@ class ParticleField {
       if (this.behavior === 'ember') alpha = 0.5 + 0.5 * Math.sin(t * 9 + this.phase[i]);
       if (this.behavior === 'mote') alpha = 0.22 + 0.2 * Math.sin(t * 1.4 + this.phase[i]);
       if (this.behavior === 'dust') alpha = 0.10 + 0.08 * Math.sin(t * 0.8 + this.phase[i]);
-      if (this.behavior === 'rain') alpha = 0.24;
+      if (this.behavior === 'rain') alpha = 0.34 + this.intensity * 0.36;
 
       this.sizes[i] = this.size0[i];
       this.alphas[i] = alpha;
@@ -262,10 +285,131 @@ class ParticleField {
     this.area = area;
   }
 
+  setIntensity(value, windX = 0, windZ = 0) {
+    const intensity = Math.max(0, Math.min(1, value));
+    const nextCount = Math.ceil(this.count * intensity);
+    for (let i = this.activeCount; i < nextCount; i++) this.spawn(i, 0);
+    this.intensity = intensity;
+    this.activeCount = nextCount;
+    this.windX = windX;
+    this.windZ = windZ;
+    this.points.geometry.setDrawRange(0, this.activeCount);
+    this.points.visible = this.activeCount > 0;
+  }
+
   remove() {
     this.scene && this.scene.remove(this.points);
     this.points.geometry.dispose();
     this.points.material.dispose();
+  }
+}
+
+class RainField {
+  constructor(scene, count = 360, area = { x: 46, z: 40 }) {
+    this.count = count;
+    this.activeCount = count;
+    this.intensity = 1;
+    this.area = area;
+    this.anchor = new THREE.Vector3();
+    this.groundY = 0;
+    this.shelter = null;
+    this.drops = new Float32Array(count * 3);
+    this.vel = new Float32Array(count * 3);
+    this.positions = new Float32Array(count * 6);
+    this.windX = 0;
+    this.windZ = 0;
+    this.geometry = new THREE.BufferGeometry();
+    this.geometry.setAttribute('position', new THREE.BufferAttribute(this.positions, 3));
+    this.geometry.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 1000);
+    this.material = new THREE.LineBasicMaterial({
+      color: 0xb9d9ef, transparent: true, opacity: 0.62, depthWrite: false,
+    });
+    this.object = new THREE.LineSegments(this.geometry, this.material);
+    this.object.frustumCulled = false;
+    this.object.renderOrder = 5;
+    this.points = this.object;
+    scene.add(this.object);
+    for (let i = 0; i < count; i++) this.spawn(i, 0);
+    this.write();
+  }
+
+  spawn(i) {
+    const j = i * 3;
+    this.drops[j] = this.anchor.x + (Math.random() * 2 - 1) * this.area.x;
+    this.drops[j + 1] = this.groundY + 12 + Math.random() * 16;
+    this.drops[j + 2] = this.anchor.z + (Math.random() * 2 - 1) * this.area.z;
+    this.vel[j] = 0.35 + Math.random() * 0.55;
+    this.vel[j + 1] = -23 - Math.random() * 9;
+    this.vel[j + 2] = 0.15 + Math.random() * 0.4;
+  }
+
+  setIntensity(value, windX = 0, windZ = 0) {
+    const intensity = Math.max(0, Math.min(1, value));
+    const nextCount = Math.ceil(this.count * intensity);
+    for (let i = this.activeCount; i < nextCount; i++) this.spawn(i);
+    this.intensity = intensity;
+    this.activeCount = nextCount;
+    this.windX = windX;
+    this.windZ = windZ;
+    this.material.opacity = 0.28 + intensity * 0.4;
+    this.geometry.setDrawRange(0, this.activeCount * 2);
+    this.object.visible = this.activeCount > 0;
+  }
+
+  setShelter(shelter) {
+    this.shelter = shelter && !shelter.indoor ? shelter : null;
+  }
+
+  isInsideShelter(x, y, z) {
+    const s = this.shelter;
+    return !!s && x >= s.minX && x <= s.maxX && y >= s.minY && y <= s.maxY && z >= s.minZ && z <= s.maxZ;
+  }
+
+  respawnOutside(i) {
+    this.spawn(i);
+    if (!this.shelter) return;
+    const j = i * 3;
+    if (this.isInsideShelter(this.drops[j], this.drops[j + 1], this.drops[j + 2])) {
+      this.drops[j] = Math.random() < 0.5 ? this.shelter.minX - 1 : this.shelter.maxX + 1;
+      this.drops[j + 2] = this.anchor.z + (Math.random() * 2 - 1) * this.area.z;
+    }
+  }
+
+  follow(camPos, groundY = this.groundY) {
+    this.anchor.set(camPos.x, groundY, camPos.z);
+    this.groundY = groundY;
+    for (let i = 0; i < this.activeCount; i++) {
+      const j = i * 3;
+      if (Math.abs(this.drops[j] - camPos.x) > this.area.x || Math.abs(this.drops[j + 2] - camPos.z) > this.area.z || this.drops[j + 1] < groundY || this.drops[j + 1] > groundY + 30) {
+        this.respawnOutside(i);
+      }
+    }
+  }
+
+  update(dt) {
+    for (let i = 0; i < this.activeCount; i++) {
+      const j = i * 3;
+      const vx = this.vel[j] + this.windX;
+      const vy = this.vel[j + 1];
+      const vz = this.vel[j + 2] + this.windZ;
+      this.drops[j] += vx * dt;
+      this.drops[j + 1] += vy * dt;
+      this.drops[j + 2] += vz * dt;
+      if (this.drops[j + 1] < this.groundY + 0.4) this.respawnOutside(i);
+      if (this.isInsideShelter(this.drops[j], this.drops[j + 1], this.drops[j + 2])) this.respawnOutside(i);
+      const k = i * 6;
+      this.positions[k] = this.drops[j];
+      this.positions[k + 1] = this.drops[j + 1];
+      this.positions[k + 2] = this.drops[j + 2];
+      this.positions[k + 3] = this.drops[j] - vx * 0.028;
+      this.positions[k + 4] = this.drops[j + 1] - vy * 0.028;
+      this.positions[k + 5] = this.drops[j + 2] - vz * 0.028;
+    }
+    this.write();
+  }
+
+  write() {
+    this.geometry.attributes.position.needsUpdate = true;
   }
 }
 
@@ -363,7 +507,7 @@ export class Effects {
     this.tex = makeSoftTexture();
 
     this.dust = new ParticleField(scene, { behavior: 'dust', count: 150, area: { x: 300, z: 260 } });
-    this.rain = new ParticleField(scene, { behavior: 'rain', count: 420, area: { x: 46, z: 40 } });
+    this.rain = new RainField(scene, 440, { x: 40, z: 34 });
     this.bursts = new BurstPool(scene);
 
     // ember hotspots: market braziers / drain pit / mausoleum gargoyles
@@ -381,14 +525,23 @@ export class Effects {
   }
 
   follow(camPos) {
-    this.rain.follow(camPos);
+    this.rain.follow(camPos, this.rainGroundY);
+  }
+
+  setWeather(weather, groundY = 0) {
+    const rain = weather.rain || 0;
+    this.rainGroundY = groundY;
+    this.rain.setShelter(weather.shelter || null);
+    this.rain.setIntensity(rain, (weather.windX || 0) * 4.5, (weather.windZ || 0) * 4.5);
   }
 
   // warm sparks above the braziers/gargoyles — repurpose a few ember slots
   update(dt, t, camPos) {
     this.dust.update(dt, t, camPos);
-    this.rain.follow(camPos);
-    this.rain.update(dt, t, camPos);
+    if (this.rain.activeCount > 0) {
+      this.rain.follow(camPos, this.rainGroundY);
+      this.rain.update(dt, t, camPos);
+    }
     this.motes.update(dt, t, camPos);
     // ember field: strongest near the active hotspot
     let hx = 138, hy = 0.8, hz = 10;

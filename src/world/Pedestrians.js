@@ -262,13 +262,20 @@ export function buildPedestrians(world) {
   world.pedsProps = props;
 }
 
-export function updatePedestrians(peds, props, dt, t, playerPos = null) {
+export function updatePedestrians(peds, props, dt, t, playerPos = null, weather = null) {
+  const rain = weather ? weather.rain || 0 : 0;
+  const wind = weather ? weather.wind || 0 : 0;
   for (const p of peds || []) {
     const fig = p.fig;
 
     // ---------- walkers ----------
     if (p.activity === null) {
       let moving = false;
+      p.weatherPauseCd = (p.weatherPauseCd || 0) - dt;
+      if (rain > 0.38 && p.weatherPauseCd <= 0) {
+        p.pauseT = Math.max(p.pauseT, 0.7 + Math.random() * 1.4);
+        p.weatherPauseCd = 2.8 + Math.random() * 3.5;
+      }
       if (p.pauseT > 0) {
         p.pauseT -= dt;
       } else {
@@ -280,10 +287,11 @@ export function updatePedestrians(peds, props, dt, t, playerPos = null) {
         const dx = b.x - a.x, dz = b.z - a.z;
         const dist = Math.hypot(dx, dz);
         if (dist < 0.001) { p.i = ti; continue; }
-        fig.g.position.x += (dx / dist) * p.speed * dt;
-        fig.g.position.z += (dz / dist) * p.speed * dt;
+        const moveSpeed = p.speed * (1 - rain * 0.55);
+        fig.g.position.x += (dx / dist) * moveSpeed * dt;
+        fig.g.position.z += (dz / dist) * moveSpeed * dt;
         fig.g.rotation.y = Math.atan2(dx, dz);
-        p.phase += dt * p.speed * 3.2;
+        p.phase += dt * moveSpeed * 3.2;
         moving = true;
         const nx = b.x - fig.g.position.x, nz = b.z - fig.g.position.z;
         if (nx * nx + nz * nz < 0.08) {
@@ -355,25 +363,36 @@ export function updatePedestrians(peds, props, dt, t, playerPos = null) {
       fig.armR.rotation.x = -Math.sin(t * 1.1 + p.phase) * 0.3;
       fig.g.position.y = Math.sin(t * 1.2 + p.phase) * 0.02;
     }
+
+    const weatherPoseTarget = Math.max(0, Math.min(1, (rain - 0.18) / 0.62));
+    p.weatherPose = (p.weatherPose || 0) + (weatherPoseTarget - (p.weatherPose || 0)) * Math.min(1, dt * 5);
+    fig.headG.rotation.x = p.weatherPose * 0.42;
+    fig.body.rotation.x = p.weatherPose * 0.08;
+    fig.armL.rotation.x = THREE.MathUtils.lerp(fig.armL.rotation.x, -0.68, p.weatherPose);
+    fig.armR.rotation.x = THREE.MathUtils.lerp(fig.armR.rotation.x, -0.52, p.weatherPose);
+    fig.armL.rotation.z = p.weatherPose * 0.22;
+    fig.armR.rotation.z = -p.weatherPose * 0.22;
+    fig.headG.rotation.z = Math.sin(t * 4 + p.phase) * wind * 0.035;
   }
 
   // pigeons hop-peck
   for (const pg of (props && props.pigeons) || []) {
     const tt = t * 2.2 + pg.phase;
-    pg.g.position.y = Math.max(0, Math.sin(tt)) * 0.06;
-    if (Math.sin(tt) > 0.96) pg.g.rotation.y = Math.sin(t * 3.1 + pg.phase * 2) * 0.6;
-    pg.g.rotation.x = Math.max(0, Math.sin(tt + 1.6)) * 0.5;
-    pg.g.position.x = pg.x + Math.sin(t * 0.4 + pg.phase) * 0.25;
-    pg.g.position.z = pg.z + Math.cos(t * 0.35 + pg.phase * 1.3) * 0.25;
+    const activity = 1 - rain * 0.82;
+    pg.g.position.y = Math.max(0, Math.sin(tt)) * 0.06 * activity;
+    if (Math.sin(tt) > 0.96) pg.g.rotation.y = Math.sin(t * 3.1 + pg.phase * 2) * 0.6 * activity;
+    pg.g.rotation.x = Math.max(0, Math.sin(tt + 1.6)) * 0.5 * activity;
+    pg.g.position.x = pg.x + Math.sin(t * 0.4 + pg.phase) * 0.25 * activity;
+    pg.g.position.z = pg.z + Math.cos(t * 0.35 + pg.phase * 1.3) * 0.25 * activity;
   }
 
   // gulls circle
   for (const glide of (props && props.gulls) || []) {
-    const a = t * 0.5 + glide.phase;
+    const a = t * (0.5 + rain * 0.35) + glide.phase;
     const rg = 3.5 + Math.sin(t * 0.3 + glide.phase) * 1.2;
     glide.g.position.x = 218 + Math.cos(a) * rg;
     glide.g.position.z = 127 + Math.sin(a) * rg;
-    glide.g.position.y = 4.5 + Math.sin(t * 0.9 + glide.phase) * 0.4;
+    glide.g.position.y = 4.5 - rain * 1.4 + Math.sin(t * 0.9 + glide.phase) * 0.4;
     glide.g.rotation.y = -a + Math.PI / 2;
     const flap = Math.sin(t * 6 + glide.phase) * 0.5;
     for (const w of glide.wings) w.rotation.z = flap;

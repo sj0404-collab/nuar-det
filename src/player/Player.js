@@ -56,6 +56,12 @@ export class Player {
     this.attackT = 0;
     this.attackCd = 0;
     this.onAttack = null;
+    this.weather = { rain: 0, windX: 0, windZ: 0, sheltered: false };
+    this.idleTime = 0;
+    this.idleActivity = null;
+    this.idleActivityTime = 0;
+    this.idleCooldown = 0;
+    this.idlePose = 0;
 
     this.buildMesh(scene);
   }
@@ -228,6 +234,11 @@ export class Player {
     this.vel.set(0, 0, 0);
     this.dashT = 0;
     this.grounded = true;
+    this.idleTime = 0;
+    this.idleActivity = null;
+    this.idleActivityTime = 0;
+    this.idleCooldown = 0;
+    this.idlePose = 0;
   }
 
   heal(amount) {
@@ -242,6 +253,60 @@ export class Player {
   get headHeight() {
     const base = (this._headOffset || 1.28) + 0.05;
     return this.crouching ? base * 0.6 : base;
+  }
+
+  setWeather(rain, windX, windZ, sheltered) {
+    this.weather.rain = rain || 0;
+    this.weather.windX = windX || 0;
+    this.weather.windZ = windZ || 0;
+    this.weather.sheltered = !!sheltered;
+  }
+
+  breakIdleActivity() {
+    this.idleTime = 0;
+    if (this.idleActivity) this.idleActivityTime = 0;
+    this.idleCooldown = Math.max(this.idleCooldown, 2);
+  }
+
+  clearIdleActivity() {
+    this.idleTime = 0;
+    this.idleActivity = null;
+    this.idleActivityTime = 0;
+    this.idleCooldown = 0;
+    this.idlePose = 0;
+  }
+
+  updateIdleActivity(dt, movement, input) {
+    const active = movement > 0.12 || this.crouching || !this.grounded || this.dashT > 0 || this.attackT > 0 || input.jump || input.dash || input.attack;
+    if (active) {
+      this.breakIdleActivity();
+      this.idlePose *= Math.max(0, 1 - dt * 12);
+      if (this.idlePose < 0.01) this.idleActivity = null;
+      return;
+    }
+
+    this.idleCooldown = Math.max(0, this.idleCooldown - dt);
+    if (this.idleActivity) {
+      const duration = this.idleActivity === 'shelter' ? 3.4 : this.idleActivity === 'stretch' ? 4.2 : 3.6;
+      this.idleActivityTime -= dt;
+      const progress = 1 - Math.max(0, this.idleActivityTime) / duration;
+      const targetPose = Math.sin(Math.max(0, Math.min(1, progress)) * Math.PI);
+      this.idlePose += (targetPose - this.idlePose) * Math.min(1, dt * 9);
+      if (this.idleActivityTime <= 0) {
+        this.idleCooldown = 4 + Math.random() * 4;
+        if (this.idlePose < 0.01) this.idleActivity = null;
+      }
+      return;
+    }
+
+    this.idlePose *= Math.max(0, 1 - dt * 7);
+    this.idleTime += dt;
+    const sheltering = this.weather.rain > 0.25 && this.weather.sheltered;
+    if (this.idleCooldown <= 0 && this.idleTime >= (sheltering ? 2.5 : 12)) {
+      this.idleActivity = sheltering ? 'shelter' : (Math.random() < 0.5 ? 'stretch' : 'look');
+      this.idleActivityTime = this.idleActivity === 'shelter' ? 3.4 : this.idleActivity === 'stretch' ? 4.2 : 3.6;
+      this.idleTime = 0;
+    }
   }
 
   update(dt, input, cameraYaw, worldGatesSolids = []) {
@@ -393,6 +458,7 @@ export class Player {
     }
 
     this.mesh.position.set(this.pos.x, this.pos.y + (this.crouching ? 0.0 : 0.06), this.pos.z);
+    this.updateIdleActivity(dt, len, input);
     this.animate(dt, speed, ty);
 
     if (this.pos.y < -60) {
@@ -405,16 +471,21 @@ export class Player {
     if (jumping) this.dashSpark = 0.25;
   }
 
-  updateScarf(dt, t, speed, verticalVelocity) {
+  updateScarf(dt, t, speed, verticalVelocity, windX = 0, windZ = 0, sheltered = false) {
     const step = Math.min(dt, 1 / 30);
     const count = this.scarfSegs.length;
+    const windScale = sheltered ? 0.25 : 1;
+    const scarfCos = Math.cos(this.scarfYaw);
+    const scarfSin = Math.sin(this.scarfYaw);
+    const localWindX = (scarfCos * windX - scarfSin * windZ) * windScale;
+    const localWindZ = (scarfSin * windX + scarfCos * windZ) * windScale;
     const motionLift = Math.min(speed * 0.065, 0.78);
     const airShift = Math.max(-0.28, Math.min(0.32, -verticalVelocity * 0.022));
     for (let i = 0; i < count; i++) {
       const s = this.scarfSegs[i];
       const tail = (i + 1) / count;
       const restPitch = -0.62 - tail * 0.62 - Math.sin(tail * Math.PI) * 0.12;
-      const targetPitch = restPitch + motionLift + airShift;
+      const targetPitch = restPitch + motionLift + airShift + localWindZ * 0.22;
       const gravityTorque = -8 * Math.cos(s.pitch);
       const bendSpring = (targetPitch - s.pitch) * 12;
       s.pitchVelocity += (gravityTorque + bendSpring - s.pitchVelocity * 6.2) * step;
@@ -426,7 +497,7 @@ export class Player {
         s.pitch = 0.2;
         s.pitchVelocity = Math.min(0, s.pitchVelocity);
       }
-      const swayTarget = Math.sin(t * 3.1 + s.phase) * (0.05 + tail * 0.1) * (0.5 + Math.min(speed, 12) * 0.06);
+      const swayTarget = Math.sin(t * 3.1 + s.phase) * (0.05 + tail * 0.1) * (0.5 + Math.min(speed, 12) * 0.06) + localWindX * (0.12 + tail * 0.2);
       s.swayVelocity += ((swayTarget - s.sway) * 12 - s.swayVelocity * 5) * step;
       s.sway += s.swayVelocity * step;
       s.sway = Math.max(-0.32, Math.min(0.32, s.sway));
@@ -486,6 +557,31 @@ export class Player {
       this.armL.rotation.x = this.crouching ? 1.15 : (-swing * 0.55 + 0.25);
     }
 
+    this.head.rotation.set(0, 0, 0);
+    this.armL.rotation.z = 0;
+    this.armR.rotation.z = 0;
+    if (this.idlePose > 0.001) {
+      const p = this.idlePose;
+      if (this.idleActivity === 'stretch') {
+        this.armL.rotation.x += p * 2.35;
+        this.armR.rotation.x += p * 2.35;
+        this.armL.rotation.z = p * 0.12;
+        this.armR.rotation.z = -p * 0.12;
+        this.head.rotation.x = -p * 0.12;
+      } else if (this.idleActivity === 'look') {
+        const duration = 3.6;
+        const progress = 1 - Math.max(0, this.idleActivityTime) / duration;
+        this.head.rotation.y = Math.sin(progress * Math.PI * 2) * 0.72 * p;
+        this.head.rotation.x = p * 0.08;
+      } else if (this.idleActivity === 'shelter') {
+        this.armL.rotation.x += (-0.8 - this.armL.rotation.x) * p;
+        this.armR.rotation.x += (-0.55 - this.armR.rotation.x) * p;
+        this.armL.rotation.z = p * 0.32;
+        this.armR.rotation.z = -p * 0.32;
+        this.head.rotation.x = p * 0.24;
+      }
+    }
+
     // coat bob & sway
     const bob = walk ? Math.abs(Math.sin(this.walkT)) * 0.05 : 0;
     this.coat.position.y = Math.sin(this.walkT * 0.5) * 0.03 - bob * 0.4;
@@ -505,7 +601,7 @@ export class Player {
     while (yawD < -Math.PI) yawD += Math.PI * 2;
     this.scarfYaw += yawD * Math.min(1, dt * 4.5);
     this.scarf.rotation.y = this.scarfYaw - this.mesh.rotation.y;
-    this.updateScarf(dt, t, speed, vy);
+    this.updateScarf(dt, t, speed, vy, this.weather.windX, this.weather.windZ, this.weather.sheltered);
     this.scarf.position.y = 1.0 + Math.sin(t * 5) * 0.015;
 
     // squash on landing

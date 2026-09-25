@@ -20,6 +20,7 @@ export class SkyDome {
       uMistShift: { value: 0.0 },
       uTime: { value: 0.0 },
       uDusk: { value: 0.0 },
+      uWeather: { value: new THREE.Vector4(0, 0.08, 0.08, 0.08) },
     };
     const mat = new THREE.ShaderMaterial({
       uniforms,
@@ -43,6 +44,7 @@ export class SkyDome {
         uniform vec3 uMoonDir;
         uniform float uStarFade;
         uniform float uMistShift;
+        uniform vec4 uWeather;
         float hash12(vec2 p) {
           return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453);
         }
@@ -108,6 +110,10 @@ export class SkyDome {
           col += vec3(0.55, 0.6, 0.75) * band * 0.18 * moonNight * smoothstep(0.3, 0.6, h);
           // twilight ribbon
           col += vec3(0.98, 0.6, 0.35) * horz * uMistShift * 0.35;
+          float storm = max(uWeather.x, uWeather.z);
+          col = mix(col, vec3(0.18, 0.23, 0.29), uWeather.w * 0.58);
+          col = mix(col, vec3(0.52, 0.59, 0.64), uWeather.y * 0.42);
+          col *= 1.0 - storm * 0.12;
           gl_FragColor = vec4(col, 1.0);
         }
       `,
@@ -121,13 +127,16 @@ export class SkyDome {
     this.lastDay = 0;
   }
 
-  update(time, dayFactor = 0) {
+  update(time, dayFactor = 0, weather = null) {
     this.uniforms.uDayFactor.value = dayFactor;
     this.uniforms.uTime.value = time;
+    if (weather) {
+      this.uniforms.uWeather.value.set(weather.rain || 0, weather.fog || 0, weather.wind || 0, weather.cloud || 0);
+    }
     // dusk flash when the sun sits near the horizon (mid-transition)
     this.uniforms.uDusk.value = Math.exp(-Math.pow((dayFactor - 0.3) / 0.1, 2));
     // stars fade out during day
-    this.uniforms.uStarFade.value = 1.0 - dayFactor * 0.85;
+    this.uniforms.uStarFade.value = (1.0 - dayFactor * 0.85) * (1.0 - (weather ? weather.cloud || 0 : 0) * 0.9);
     // mist-shift in the haze band; stronger at dusk/night
     this.uniforms.uMistShift.value = Math.sin(time * 0.1) * 0.5 + 0.5;
     // subtle breathing of the glow color

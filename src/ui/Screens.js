@@ -100,6 +100,15 @@ export class Screens {
       });
     }
 
+    const weatherSelect = document.getElementById('weather-mode-select');
+    if (weatherSelect) {
+      weatherSelect.value = localStorage.getItem('nuar_weather_mode') || 'auto';
+      weatherSelect.addEventListener('change', (e) => {
+        localStorage.setItem('nuar_weather_mode', e.target.value);
+        if (this.hooks.onWeatherMode) this.hooks.onWeatherMode(e.target.value);
+      });
+    }
+
     // camera sensitivity slider (pause)
     const sensSlider = document.getElementById('cam-sens-slider');
     if (sensSlider) {

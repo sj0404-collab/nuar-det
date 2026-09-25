@@ -255,12 +255,12 @@ export class World {
     }
   }
 
-  updateFog(time, dayFactor = 0) {
+  updateFog(time, dayFactor = 0, weatherFog = 0) {
     const night = 1 - dayFactor;
     for (const f of this.fogSprites) {
       f.s.position.y = f.base + Math.sin(time * f.speed + f.phase) * 0.7;
       // denser, colder night fog; lighter drier air by day
-      f.s.material.opacity = Math.max(0.05, f.op * (0.35 + night * 0.85));
+      f.s.material.opacity = Math.min(0.78, Math.max(0.05, f.op * (0.35 + night * 0.85 + weatherFog * 0.5)));
     }
   }
 

@@ -13,6 +13,8 @@ export class HUD {
     this.secondHand = document.getElementById('clock-second');
     this.clockDigital = document.getElementById('clock-digital');
     this.clockIcon = document.getElementById('clock-icon');
+    this.weatherIcon = document.getElementById('weather-icon');
+    this.weatherState = '';
   }
 
   setClock(h, m, s, dayFactor) {
@@ -29,6 +31,15 @@ export class HUD {
       this.clockIcon.textContent = dayFactor > 0.85 ? '☀️'
         : dayFactor > 0.45 ? '🌇' : '🌙';
     }
+  }
+
+  setWeather(state) {
+    if (!this.weatherIcon || state === this.weatherState) return;
+    this.weatherState = state;
+    const icons = { clear: '☀️', fog: '🌫', wind: '💨', rain: '🌧' };
+    const labels = { clear: 'Ясно', fog: 'Туман', wind: 'Ветер', rain: 'Дождь' };
+    this.weatherIcon.textContent = icons[state] || '☁';
+    this.weatherIcon.title = labels[state] || 'Погода';
   }
 
   setTouch(tc) { this.touch = tc; }

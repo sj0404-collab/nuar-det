@@ -29,6 +29,16 @@ import { Minimap } from './ui/Minimap.js';
 import { Tutorial } from './ui/Tutorial.js';
 
 const ABILITY_KEYS = { dash: 'dash', jump: 'jump', wall: 'wall', lens: 'lens' };
+const SHELTERS = [
+  { minX: 97, maxX: 179, minY: -44, maxY: -20, minZ: -87, maxZ: 1 },
+  { minX: -6, maxX: 6, minY: -2, maxY: 48, minZ: -146, maxZ: -134 },
+  { minX: 21.5, maxX: 26.5, minY: -1, maxY: 3.5, minZ: -48.3, maxZ: -46.8 },
+  { minX: 29.5, maxX: 34.5, minY: -1, maxY: 3.5, minZ: 3.3, maxZ: 4.8 },
+  { minX: -34.5, maxX: -29.5, minY: -1, maxY: 3.5, minZ: 3.3, maxZ: 4.8 },
+  { minX: 41.5, maxX: 46.5, minY: -1, maxY: 3.5, minZ: 57.8, maxZ: 59.5 },
+  { minX: 109.5, maxX: 114.5, minY: -1, maxY: 3.5, minZ: -43.7, maxZ: -42.1 },
+  { minX: 103.5, maxX: 108.5, minY: -1, maxY: 3.5, minZ: 56.3, maxZ: 57.9 },
+];
 
 export class Game {
   constructor(canvas) {
@@ -57,10 +67,15 @@ export class Game {
     // суточный цикл привязан к реальному дню устройства (24 реальных часа)
     this.timeCycle = new TimeCycle();
     this.timeMode = localStorage.getItem('nuar_time_mode') || 'device'; // device | pause
+    this.weatherMode = localStorage.getItem('nuar_weather_mode') || 'auto';
+    this.rainGroundY = 0;
+    this.timeCycle.setWeatherMode(this.weatherMode, true);
     this._lastDayFactor = -1;
+    this._lastWeatherFog = -1;
     // fog day/night palettes
     this.fogNight = new THREE.Color(0x0f1a2c);
     this.fogDay = new THREE.Color(0x9fb8cc);
+    this.fogWeather = new THREE.Color(0x738493);
 
     this.world = new World(this.scene);
     // install room builder
@@ -136,6 +151,7 @@ export class Game {
       onRelayTest: () => this.testRelay(),
       onTimeSpeed: (mode) => this.setTimeMode(mode),
       getTimeMode: () => this.timeMode,
+      onWeatherMode: (mode) => this.setWeatherMode(mode),
       onPersonaSet: (p) => { this.setPersona(p); },
       getPersona: () => this.persona.id,
       hasSave: () => this.hasSave(),
@@ -1000,6 +1016,28 @@ export class Game {
     localStorage.setItem('nuar_time_mode', mode);
   }
 
+  setWeatherMode(mode) {
+    this.weatherMode = mode;
+    localStorage.setItem('nuar_weather_mode', mode);
+    this.timeCycle.setWeatherMode(mode, true);
+  }
+
+  isIndoor(pos = this.player.pos) {
+    return pos.y < -5 || (pos.x >= -6 && pos.x <= 6 && pos.y >= -2 && pos.y <= 48 && pos.z >= -146 && pos.z <= -134);
+  }
+
+  getShelterAt(pos = this.player.pos) {
+    if (this.isIndoor(pos)) return { indoor: true };
+    for (const s of SHELTERS) {
+      if (pos.x >= s.minX && pos.x <= s.maxX && pos.y >= s.minY && pos.y <= s.maxY && pos.z >= s.minZ && pos.z <= s.maxZ) return s;
+    }
+    return null;
+  }
+
+  isSheltered(pos = this.player.pos) {
+    return !!this.getShelterAt(pos);
+  }
+
   // множитель скорости времени: устройство-режим синхронизирован всегда,
   // единственный тумблер — «остановка времени» (полезно в найт-сценах)
   getTimeScale() {
@@ -1007,12 +1045,15 @@ export class Game {
     return 1;
   }
 
-  applyDayNight(dayFactor) {
-    if (Math.abs(dayFactor - this._lastDayFactor) < 0.002) return;
+  applyDayNight(dayFactor, weather = this.timeCycle.weather) {
+    const weatherFog = weather.fog || 0;
+    if (Math.abs(dayFactor - this._lastDayFactor) < 0.002 && Math.abs(weatherFog - this._lastWeatherFog) < 0.002) return;
     this._lastDayFactor = dayFactor;
-    // туман мира: ночью тёмный нуар, днём — светлая дымка
+    this._lastWeatherFog = weatherFog;
     if (this.scene.fog) {
-      this.scene.fog.color.copy(this.fogNight).lerp(this.fogDay, dayFactor);
+      this.scene.fog.color.copy(this.fogNight).lerp(this.fogDay, dayFactor).lerp(this.fogWeather, weatherFog * 0.72);
+      this.scene.fog.near = 26 - weatherFog * 15;
+      this.scene.fog.far = Math.max(125, 250 - weatherFog * 115);
     }
   }
 
@@ -1093,6 +1134,7 @@ export class Game {
 
   setCameraMode(mode) {
     if (!['orbit', 'top', 'fps'].includes(mode)) return;
+    this.player.breakIdleActivity();
     this.cameraMode = mode;
     localStorage.setItem('nuar_cam_mode', mode);
     this.screens.setCameraMode(mode);
@@ -1337,6 +1379,7 @@ export class Game {
     document.getElementById('seat-choice').classList.add('hidden');
     const seatY = v.cab ? 1.15 : v.tram ? 0.7 : 0.95;
     if (asDriver && v.baseSpeed === undefined) v.baseSpeed = v.speed;
+    this.player.clearIdleActivity();
     this.mount = {
       veh: v,
       seat: new THREE.Vector3(0, seatY, 0),
@@ -1584,17 +1627,35 @@ export class Game {
     const t = this.clock.elapsedTime;
     // суточный цикл
     const timeScale = this.getTimeScale();
-    if (timeScale > 0) this.timeCycle.update(dt * timeScale);
+    if (this.mode !== 'pause') {
+      if (this.timeMode === 'pause') this.timeCycle.updateWeather(dt);
+      else if (timeScale > 0) this.timeCycle.update(dt * timeScale);
+    }
     const dayFactor = this.timeCycle.dayFactorF || 0;
-    this.sky.update(t, dayFactor);
-    this.applyDayNight(dayFactor);
-    this.world.updateFog(t, dayFactor);
+    const rawWeather = this.timeCycle.weather;
+    const shelter = this.getShelterAt();
+    const sheltered = !!shelter;
+    const indoor = this.isIndoor();
+    const weather = { ...rawWeather, sheltered, indoor, shelter };
+    const visualWeather = {
+      ...weather,
+      rain: indoor ? 0 : weather.rain,
+      fog: weather.fog * (indoor ? 0.15 : 1),
+    };
+    this.weatherContext = weather;
+    this.player.setWeather(weather.rain, weather.windX, weather.windZ, sheltered);
+    if (this.player.grounded || Math.abs(this.player.pos.y - this.rainGroundY) > 12) this.rainGroundY = this.player.pos.y;
+    else this.rainGroundY += (this.player.pos.y - this.rainGroundY) * Math.min(1, dt * 0.45);
+    this.sky.update(t, dayFactor, visualWeather);
+    this.applyDayNight(dayFactor, visualWeather);
+    this.world.updateFog(t, dayFactor, visualWeather.fog);
+    this.effects.setWeather(visualWeather, this.rainGroundY);
     this.effects.update(dt, t, this.camera.position);
     this.glow.update(t, dayFactor);
     this.hud.setClock(
       this.timeCycle.hour, this.timeCycle.minute, this.timeCycle.second, dayFactor
     );
-    this.effects.rain.points.visible = this.player.pos.y > -5;
+    this.hud.setWeather(weather.state);
     this.holo.update(t, dt);
 
     if (this.mode === 'ending') {
@@ -1671,7 +1732,8 @@ export class Game {
     this.audio.setZone('plaza', zone(64, -33, 30));
     this.audio.setZone('harbor', zone(196, 122, 44));
     this.audio.setZone('drain', zone(132, 12, 24));
-    this.audio.setWind(Math.max(0, Math.min(1, p.y / 26 + zone(84, 4, 40) * 0.5)));
+    const weatherWind = this.weatherContext ? this.weatherContext.wind * (this.weatherContext.sheltered ? 0.25 : 1) : 0;
+    this.audio.setWind(Math.max(weatherWind, Math.max(0, Math.min(1, p.y / 26 + zone(84, 4, 40) * 0.5))));
     void dt;
   }
 
@@ -1684,6 +1746,7 @@ export class Game {
     const joyX = this.input.camJoyX;
     const joyY = this.input.camJoyY;
     const keyCam = this.input.camHeld;
+    if (Math.abs(joyX) > 0.08 || Math.abs(joyY) > 0.08 || keyCam !== 0 || input.camMode || input.camModeSet) this.player.breakIdleActivity();
 
     // camera mode: V cycles, 1/2/3 and HUD buttons pick a specific view
     if (input.camModeSet) {
@@ -1956,8 +2019,9 @@ export class Game {
 
   animateProps(dt) {
     const t = this.clock.elapsedTime;
+    const weather = this.weatherContext || { rain: 0, wind: 0 };
     this.world.updateTraffic(dt, t);
-    updatePedestrians(this.world.peds, this.world.pedsProps, dt, t, this.player.pos);
+    updatePedestrians(this.world.peds, this.world.pedsProps, dt, t, this.player.pos, this.weatherContext);
     for (const it of this.world.items) {
       if (it.taken) continue;
       it.mesh.position.y = it.pos.y + Math.sin(t * 2 + it.pos.x) * 0.18;
@@ -1997,14 +2061,18 @@ export class Game {
       n.figure.rotation.y += Math.sin(t * 0.4 + n.bobPhase) * 0.002;
       // anime idle: arms sway, head drifts, slight breathing lean
       const breathe = Math.sin(t * 1.4 + n.bobPhase) * 0.02;
-      if (n.armL) n.armL.rotation.z = 0.08 + Math.sin(t * 1.2 + n.bobPhase) * 0.06;
-      if (n.armR) n.armR.rotation.z = -0.08 - Math.sin(t * 1.2 + n.bobPhase) * 0.06;
-      if (n.armL) n.armL.rotation.x = Math.sin(t * 0.9 + n.bobPhase) * 0.05;
-      if (n.armR) n.armR.rotation.x = -Math.sin(t * 0.9 + n.bobPhase) * 0.05;
+      const npcShelter = this.getShelterAt({ x: n.pos.x, y: n.pos.y, z: n.pos.z });
+      const npcRain = npcShelter ? 0 : weather.rain;
+      const npcWind = npcShelter ? weather.wind * 0.25 : weather.wind;
+      if (n.armL) n.armL.rotation.z = 0.08 + Math.sin(t * 1.2 + n.bobPhase) * 0.06 + npcRain * 0.18;
+      if (n.armR) n.armR.rotation.z = -0.08 - Math.sin(t * 1.2 + n.bobPhase) * 0.06 - npcRain * 0.18;
+      if (n.armL) n.armL.rotation.x = Math.sin(t * 0.9 + n.bobPhase) * 0.05 - npcRain * 0.46;
+      if (n.armR) n.armR.rotation.x = -Math.sin(t * 0.9 + n.bobPhase) * 0.05 - npcRain * 0.38;
       // оживший NPC: следит за игроком, когда тот подходит, и кивает
       const pdx = this.player.pos.x - n.pos.x;
       const pdz = this.player.pos.z - n.pos.z;
       const near = pdx * pdx + pdz * pdz < 36;
+      if (n.headG) n.headG.rotation.x = npcRain * 0.24;
       if (near) {
         const want = Math.atan2(pdx, pdz);
         let rel = want - n.figure.rotation.y;
@@ -2016,8 +2084,8 @@ export class Game {
       } else {
         if (n.headG) n.headG.rotation.y = Math.sin(t * 0.5 + n.bobPhase) * 0.08;
       }
-      n.figure.rotation.x = 0.08 + breathe;
-      n.figure.rotation.z = Math.sin(t * 1.1 + n.bobPhase) * 0.015;
+      n.figure.rotation.x = 0.08 + breathe + npcRain * 0.07;
+      n.figure.rotation.z = Math.sin(t * 1.1 + n.bobPhase) * 0.015 + Math.sin(t * 2.2 + n.bobPhase) * npcWind * 0.025;
     }
   }
 

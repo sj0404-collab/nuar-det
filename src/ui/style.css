@@ -69,6 +69,7 @@ canvas#game-canvas { position: absolute; inset: 0; width: 100%; height: 100%; di
 #clock-cap { position: absolute; left: 50%; top: 50%; width: 4px; height: 4px; margin: -2px 0 0 -2px; border-radius: 50%; background: #b0342e; z-index: 2; }
 #clock-digital { font-size: 11px; letter-spacing: 1px; color: var(--parch); font-variant-numeric: tabular-nums; min-width: 54px; }
 #clock-icon { font-size: 14px; }
+#weather-icon { font-size: 14px; opacity: 0.85; }
 #logs { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; justify-content: center; flex: 1 1 auto; min-width: 0; overflow: hidden; }
 .log-chip {
   font-size: 11px; color: var(--mint); background: rgba(5,10,14,0.55);
@@ -462,7 +463,7 @@ body.in-combat #hint { display: none !important; }
   #hud-clock { transform: scale(0.86); transform-origin: left top; margin-bottom: -6px; }
   .clock-dial { width: 34px; height: 34px; }
   #clock-digital { font-size: 10px; min-width: 50px; }
-  #clock-icon { font-size: 12px; }
+  #clock-icon, #weather-icon { font-size: 12px; }
   #logs, #abilities { display: none; }
   #right-panel {
     width: 100%; min-width: 0; margin-left: 0; flex-direction: column; align-items: stretch; gap: 4px;
